@@ -10,5 +10,5 @@
 * Known bugs: None currently recorded. Update this list as issues are discovered and confirmed.
 
 ## ⏭️ Next Steps
-1.  Review `/AI_REPO_GUIDE.md` and `.github/copilot-instructions.md` to confirm the current project phase, priorities, and verification commands.
+1.  Review `.github/copilot-instructions.md` and, if present, `/AI_REPO_GUIDE.md` to confirm the current project phase, priorities, and verification commands. If `/AI_REPO_GUIDE.md` is missing or clearly stale, follow `.github/prompts/repo-onboarding.md` to create or refresh it, then re-review the updated guide.
 2.  Update this "Active Agent State" file with the current phase, active task, and any recent architectural decisions or known issues based on the latest work.
