@@ -12,4 +12,4 @@
 
 ## 🔄 CI/CD & Self-Healing
 * **Pipeline:** GitHub Actions triggers on push.
-* **Rule:** If a test fails, you must analyze the failure log and REFUSE to proceed to the next roadmap item until the test passes.
+* **Rule:** If a test fails, you must analyze the failure log and do not proceed to the next roadmap item until the test passes.

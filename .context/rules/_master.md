@@ -13,7 +13,7 @@ You are stateless. To maintain project continuity, you must follow this loop for
     * Testing/CI -> `domain_qa.md`
 3.  **PLAN:** Propose a step-by-step implementation plan.
 4.  **EXECUTE:** Write atomic, modular code.
-5.  **UPDATE STATE:** At the end of your response, output an updated version of `active_task.md` reflecting your progress.
+5.  **SUGGEST STATE UPDATE:** At the end of your response, propose the updated contents for `active_task.md` reflecting your progress (as text the user can apply), rather than implying you can modify files directly.
 
 ## 📂 Repository Map
 * **`/.context`**: Your memory. Read-only rules and read-write state.
