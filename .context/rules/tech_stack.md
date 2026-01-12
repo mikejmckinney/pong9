@@ -18,4 +18,4 @@
 
 ## Deployment
 * **Client:** GitHub Pages or Netlify (Static).
-* **Server:** Dockerized Node.js container (Render/Railway/Fly.io).
+* **Server:** Docker container running Node.js (Render/Railway/Fly.io).

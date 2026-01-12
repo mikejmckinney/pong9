@@ -16,9 +16,9 @@ You must adhere to this strict color palette and style guide:
 * **Input Handling:**
     * **Touch Action:** Apply `touch-action: none` to the canvas container CSS to prevent browser scrolling.
     * **Controls:** Split-screen invisible touch zones.
-        * Left 50% screen tap = Move Up.
-        * Right 50% screen tap = Move Down.
-        * *Note:* Support Multi-touch points.
+        * Left 50% of the screen controls **Player 1** paddle: tap/drag in the upper half = move up, tap/drag in the lower half = move down.
+        * Right 50% of the screen controls **Player 2** paddle: tap/drag in the upper half = move up, tap/drag in the lower half = move down.
+        * *Note:* Support Multi-touch points (both paddles can be controlled simultaneously).
 * **Orientation:** Force Landscape.
     * Implement a CSS Overlay asking users to "Rotate Device" if `window.innerHeight > window.innerWidth`.
 

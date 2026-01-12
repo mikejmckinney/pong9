@@ -1,14 +1,14 @@
 # 🧠 Active Agent State
-*Last Updated: [Date]*
+*Last Updated: 2026-01-12*
 
 ## 📍 Current Status
-**Phase:** [e.g., Phase 1]
-**Active Task:** [e.g., Implementing Paddle Physics]
+**Phase:** Phase 1 — The Core Loop (Local Prototype)
+**Active Task:** Active task not yet recorded.
 
 ## 📋 Context & Decisions
-* [Log recent architectural decisions here, e.g., "Chose to use Arcade Physics for simplicity over Matter.js"]
-* [Log known bugs, e.g., "Ball gets stuck in corner at high velocity"]
+* This file tracks high-level status, recent architectural decisions, and open issues relevant to the current phase of work.
+* Known bugs: None currently recorded. Update this list as issues are discovered and confirmed.
 
 ## ⏭️ Next Steps
-1.  [Step 1]
-2.  [Step 2]
+1.  Review `/AI_REPO_GUIDE.md` and `.github/copilot-instructions.md` to confirm the current project phase, priorities, and verification commands.
+2.  Update this "Active Agent State" file with the current phase, active task, and any recent architectural decisions or known issues based on the latest work.
