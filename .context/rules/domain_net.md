@@ -20,3 +20,14 @@ export class GameState extends Schema {
     @type("number") ballX: number;
     @type("number") ballY: number;
 }
+```
+
+##⚡ Lag Compensation
+1. Local Prediction: Client moves the local paddle immediately on input. Reconcile with server state only if deviation > 5px.
+2. Interpolation: Client buffers remote entity updates and interpolates (lerp) between snapshots to ensure smooth movement.
+3. Matchmaking: Use Room logic to auto-match 2 players. If 1 player is waiting, create room; if room exists with 1 player, join it.
+
+🛡️ Power-Up Synchronization
+1. Spawn power-ups via Server Event.
+2. Server handles collision validation.
+3. Durations are managed by server timestamps.
