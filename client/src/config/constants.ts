@@ -21,8 +21,13 @@ export const BALL_SIZE = 20;
 // Visual constants
 export const GRID_PERSPECTIVE_SPACING = 100;
 export const GRID_HORIZONTAL_SPACING = 40;
+export const GRID_HORIZON_RATIO = 0.4;  // Horizon Y position as ratio of screen height
 export const CENTER_LINE_DASH_LENGTH = 20;
 export const CENTER_LINE_GAP_LENGTH = 20;
+
+// Bloom PostFX constants
+export const BLOOM_STRENGTH = 1.5;
+export const BLOOM_BLUR_STRENGTH = 2;
 
 // Gameplay timing constants
 export const BALL_LAUNCH_DELAY_MS = 1000;

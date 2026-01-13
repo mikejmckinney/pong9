@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALL_SIZE, BALL_SPEED } from '../config/constants';
+import { BALL_SIZE, BALL_SPEED, GAME_HEIGHT } from '../config/constants';
 
 export default class Ball extends Phaser.Physics.Arcade.Sprite {
     constructor(scene: Phaser.Scene, x: number, y: number, color: number) {
@@ -20,11 +20,29 @@ export default class Ball extends Phaser.Physics.Arcade.Sprite {
         scene.physics.add.existing(this);
 
         // Set physics properties
-        this.setCollideWorldBounds(true);
-        this.setBounce(1, 1);
+        // Note: We don't use setCollideWorldBounds(true) because we need the ball
+        // to pass through left/right edges for scoring. Top/bottom bounce is handled manually.
         if (this.body instanceof Phaser.Physics.Arcade.Body) {
             this.body.allowGravity = false;
-            this.body.onWorldBounds = true;
+        }
+    }
+
+    update() {
+        // Handle top/bottom wall bouncing manually (ball should bounce off top/bottom but pass through left/right)
+        const body = this.body;
+        if (!(body instanceof Phaser.Physics.Arcade.Body)) {
+            return;
+        }
+
+        // Bounce off top wall
+        if (body.y <= 0) {
+            body.y = 0;
+            body.velocity.y = Math.abs(body.velocity.y);
+        }
+        // Bounce off bottom wall
+        if (body.y + body.height >= GAME_HEIGHT) {
+            body.y = GAME_HEIGHT - body.height;
+            body.velocity.y = -Math.abs(body.velocity.y);
         }
     }
 
@@ -36,20 +54,6 @@ export default class Ball extends Phaser.Physics.Arcade.Sprite {
         
         const velocity = this.scene.physics.velocityFromAngle(angle, BALL_SPEED);
         this.setVelocity(velocity.x * direction, velocity.y);
-    }
-
-    reverseX() {
-        const body = this.body;
-        if (!(body instanceof Phaser.Physics.Arcade.Body)) {
-            return;
-        }
-
-        // Reverse horizontal direction and add slight vertical variation
-        this.setVelocityX(-body.velocity.x);
-        
-        // Add small random vertical component to make gameplay more interesting
-        const verticalVariation = Phaser.Math.Between(-50, 50);
-        this.setVelocityY(body.velocity.y + verticalVariation);
     }
 
     reset() {
