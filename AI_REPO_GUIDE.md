@@ -277,7 +277,7 @@ From `.context/roadmap.md`:
 
 **Problem:** `.github/copilot-instructions.md` appears inconsistent with this guide or recent repository changes.
 
-**Solution:** Treat `.github/copilot-instructions.md` as the canonical reference for editor/agent integrations. When commands, structure, or conventions change, update both this file and `.github/copilot-instructions.md` in the same PR. If the Copilot instructions drift or become generic again, re-run the workflow in `.github/prompts/copilot-onboarding.md` to regenerate them after first updating this guide.
+**Solution:** This guide (`AI_REPO_GUIDE.md`) is the canonical source of truth. The `.github/copilot-instructions.md` file is a tailored version for editor/agent integrations and must be kept in sync. When commands, structure, or conventions change, update both this file and `.github/copilot-instructions.md` in the same PR. If the Copilot instructions drift or become generic again, re-run the workflow in `.github/prompts/copilot-onboarding.md` to regenerate them after first updating this guide.
 
 ### Agent State is Unclear
 
