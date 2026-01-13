@@ -2,17 +2,17 @@
 
 ## What This Repo Does
 
-This is a **template repository** for building a mobile-first multiplayer Pong game with a Retro Synthwave aesthetic. The repository provides AI agent configurations, onboarding prompts, and structural conventions to facilitate rapid development of a Phaser 3 (client) + Node.js/Colyseus (server) game architecture.
+This is a **mobile-first multiplayer Pong game** with a Retro Synthwave aesthetic. The repository contains AI agent configurations, onboarding prompts, structural conventions, and a working Phaser 3 game client.
 
-**Current Status:** Pre-development template phase. The repository contains agent instructions, style guides, and architectural documentation but no actual game implementation yet.
+**Current Status:** Phase 1 (The Core Loop) - Local prototype implemented. The game client is functional with paddles, ball physics, scoring, touch controls, and Synthwave visuals.
 
 ## Tech Stack
 
-- **Language:** TypeScript (Strict Mode) planned for both client and server
-- **Frontend Engine:** Phaser 3 (planned)
-- **Backend Framework:** Node.js + Colyseus (planned)
+- **Language:** TypeScript (Strict Mode) for both client and server
+- **Frontend Engine:** Phaser 3.70.0
+- **Build Tool:** Vite 7.x
+- **Backend Framework:** Node.js + Colyseus (planned for Phase 2)
 - **Database:** Firebase v9 Modular SDK (planned for leaderboards)
-- **Build Tool:** Vite or Webpack (planned)
 - **Test Framework:** Jest (planned)
 - **Deployment:** 
   - Client: GitHub Pages or Netlify (static)
@@ -22,6 +22,20 @@ This is a **template repository** for building a mobile-first multiplayer Pong g
 
 ```
 /
+├── client/                # Phaser 3 game client (Phase 1 complete)
+│   ├── src/
+│   │   ├── main.ts       # Phaser game bootstrap and configuration
+│   │   ├── scenes/       # Game scenes
+│   │   │   └── GameScene.ts  # Main gameplay scene with Synthwave aesthetic
+│   │   ├── objects/      # Game entities
+│   │   │   ├── Paddle.ts # Paddle class with procedural generation
+│   │   │   └── Ball.ts   # Ball class with procedural generation
+│   │   └── input/        # Input handling
+│   │       └── TouchInputManager.ts  # Split-screen touch controls
+│   ├── index.html        # HTML entry with CRT overlays and orientation detection
+│   ├── package.json      # NPM dependencies and scripts
+│   ├── tsconfig.json     # TypeScript configuration (strict mode)
+│   └── vite.config.ts    # Vite build configuration
 ├── .context/              # Agent memory and state tracking
 │   ├── rules/            # Domain-specific architectural rules
 │   │   ├── _master.md   # Core agent protocol and repository map
@@ -52,18 +66,24 @@ This is a **template repository** for building a mobile-first multiplayer Pong g
 └── test.sh               # Template verification script
 ```
 
-**Note:** `/client`, `/server`, and `/shared` directories are planned but not yet created.
+**Note:** `/server` and `/shared` directories are planned for Phase 2 (Network Plumbing).
 
 ## Key Entry Points
 
-**Current State:** This is a template repository. No main application entry points exist yet.
+**Client Application:**
+- `client/src/main.ts` - Phaser game bootstrap and configuration
+- `client/src/scenes/GameScene.ts` - Main gameplay scene
 
-**Planned Entry Points:**
-- **Client:** Will be in `/client` directory (Phaser 3 bootstrap)
+**Planned Entry Points (Phase 2+):**
 - **Server:** Will be in `/server` directory (Colyseus server initialization)
 - **Shared:** Will be in `/shared` directory (TypeScript interfaces)
 
 ## Configuration Files
+
+- **Client Configuration:**
+  - `client/package.json` - NPM dependencies and scripts
+  - `client/tsconfig.json` - TypeScript strict mode configuration
+  - `client/vite.config.ts` - Vite build configuration
 
 - **Agent Configuration:**
   - `.github/copilot-instructions.md` - GitHub Copilot agent instructions
@@ -90,6 +110,26 @@ This script:
 - Copies AI prompts to `.github/prompts/`
 - Sets up the development workspace
 
+### Run the Game Client
+
+```bash
+# Install dependencies
+cd client && npm install
+
+# Start development server (hot reload)
+npm run dev
+```
+
+The game will be available at `http://localhost:3000` (or next available port).
+
+### Build for Production
+
+```bash
+cd client && npm run build
+```
+
+Output will be in `client/dist/`.
+
 ### Verify Template Structure
 
 ```bash
@@ -99,13 +139,14 @@ bash test.sh
 
 Expected output: All required files should exist and pass validation checks.
 
-**Note:** No client/server applications exist yet to run. This repository is in the template/setup phase.
-
 ## How to Test
 
 ```bash
 # Verify template structure and file integrity
 bash test.sh
+
+# Build the client (TypeScript compilation check)
+cd client && npm run build
 ```
 
 The test script checks for:
@@ -189,11 +230,11 @@ Headless Phaser testing using `jest`, `jsdom`, and `node-canvas`.
 
 From `.context/roadmap.md`:
 
-**Phase 1:** The Core Loop (Local Prototype)
-- Setup Phaser 3 + TypeScript
-- Implement Paddle/Ball Physics
-- Implement Synthwave Graphics
-- Implement Mobile Scale Manager and Touch Inputs
+**Phase 1:** The Core Loop (Local Prototype) ✅ **COMPLETE**
+- ✅ Setup Phaser 3 + TypeScript + Vite
+- ✅ Implement Paddle/Ball Physics (Arcade Physics)
+- ✅ Implement Synthwave Graphics (PostFX Bloom, procedural grid)
+- ✅ Implement Mobile Scale Manager (FIT mode) and Touch Inputs
 
 **Phase 2:** The Network Plumbing
 - Setup Node.js + Colyseus Server
@@ -209,23 +250,32 @@ From `.context/roadmap.md`:
 
 **Phase 4:** Polish & Persistence
 - Integrate Firebase v9 for Leaderboards
-- Procedural Audio (Web Audio API)
-- CSS CRT Overlays
+- Procedural Audio (Web Audio API) - ✅ Basic implementation done
+- CSS CRT Overlays - ✅ Done
 - Configure Dockerfile for deployment
 
 ## Where to Add Things
 
-**Note:** Project structure not yet created. When implemented:
-
-- **New UI Components** → `/client/src/scenes/` (Phaser scenes)
-- **Client Input Logic** → `/client/src/input/` 
-- **Server Game Logic** → `/server/src/rooms/` (Colyseus rooms)
-- **Shared Types** → `/shared/` (TypeScript interfaces)
+- **New Phaser Scenes** → `/client/src/scenes/`
+- **Game Objects (Paddle, Ball, etc.)** → `/client/src/objects/`
+- **Input Handlers** → `/client/src/input/`
+- **Server Game Logic** → `/server/src/rooms/` (Phase 2)
+- **Shared Types** → `/shared/` (Phase 2)
 - **Tests** → Mirror source structure (`/client/tests/`, `/server/tests/`)
-- **Configuration** → Root-level config files
+- **Configuration** → Root-level config files or `client/` for client-specific
 - **Agent Instructions** → `.context/rules/` or `.github/agents/`
 
 ## Known Risks/Gotchas
+
+### Client-Specific
+
+1. **Phaser PostFX Bloom** - Use direct property assignment (`bloom.strength = 1.5`), not setter methods.
+
+2. **Audio context requires user interaction** - AudioContext is unlocked on first tap/click per mobile autoplay policy.
+
+3. **Touch-action CSS required** - `touch-action: none` is applied to prevent browser scrolling during gameplay.
+
+4. **Landscape orientation enforced** - CSS overlay prompts users to rotate device if in portrait mode.
 
 ### Template-Specific
 
@@ -233,9 +283,7 @@ From `.context/roadmap.md`:
 
 2. **copilot-instructions.md is configured** - This repo uses repository-specific Copilot instructions in `.github/copilot-instructions.md`. If those instructions become stale after major workflow or structure changes, refresh them using `.github/prompts/copilot-onboarding.md` once this guide is up to date.
 
-3. **No actual codebase yet** - This is a template repository with instructions but no game implementation.
-
-4. **test.sh expects specific files** - Adding/removing template files requires updating the test script.
+3. **test.sh expects specific files** - Adding/removing template files requires updating the test script.
 
 ### Architectural (Planned)
 
