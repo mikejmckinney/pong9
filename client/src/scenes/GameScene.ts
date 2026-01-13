@@ -19,7 +19,13 @@ import { MESSAGE_TYPES, ROOM_NAME, type GamePhase, type InputDirection, type Pla
 import type { GameState } from '@shared/GameState';
 import { getPlayerBySide } from '@shared/playerUtils';
 
-const NETWORK_POSITION_EPSILON = 0.5;
+// Network smoothing constants
+const NETWORK_POSITION_EPSILON = 0.5; // Ignore tiny ball deltas to reduce jitter
+const LOCAL_PADDLE_RECONCILE_THRESHOLD = 5; // Pixels of deviation allowed before reconciling local paddle
+const LOCAL_PADDLE_RECONCILE_LERP_ALPHA = 0.5; // Minimum correction factor for local paddle reconciliation
+const REMOTE_PADDLE_LERP_ALPHA = 0.35; // Remote paddle interpolation factor
+const REMOTE_PADDLE_EPSILON = 0.5; // Ignore remote paddle deltas smaller than this
+const BALL_LERP_ALPHA = 0.35; // Ball interpolation factor when following server state
 
 export default class GameScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
@@ -475,23 +481,38 @@ export default class GameScene extends Phaser.Scene {
         this.setNetworkBallMode(state.phase === 'playing');
 
         state.players.forEach((player, sessionId) => {
-            const isLocalPlayer = sessionId === this.networkRoom!.sessionId;
-            if (isLocalPlayer) {
-                if (!this.localSide) {
-                    this.localSide = player.side;
-                }
-                // Skip syncing local player position - use client-side prediction
-                // Phase 3 will add reconciliation when deviation exceeds threshold
+            const paddle = this.getPaddleBySide(player.side);
+            if (!paddle) {
                 return;
             }
 
             // Convert server's top-edge Y to Phaser's center-based Y coordinate
             // Server stores paddle position as top edge (clamped to [0, GAME_HEIGHT - PADDLE_HEIGHT])
             // Phaser sprites use center-based coordinates
-            const centerY = player.y + PADDLE_HEIGHT / 2;
-            const paddle = this.getPaddleBySide(player.side);
-            if (paddle) {
-                paddle.setY(centerY);
+            const targetCenterY = player.y + PADDLE_HEIGHT / 2;
+            const isLocalPlayer = sessionId === this.networkRoom!.sessionId;
+
+            if (isLocalPlayer) {
+                if (!this.localSide) {
+                    this.localSide = player.side;
+                }
+                const deviation = Math.abs(paddle.y - targetCenterY);
+                if (deviation > LOCAL_PADDLE_RECONCILE_THRESHOLD) {
+                    const lerpAlpha = Phaser.Math.Clamp(
+                        deviation / (LOCAL_PADDLE_RECONCILE_THRESHOLD * 4),
+                        LOCAL_PADDLE_RECONCILE_LERP_ALPHA,
+                        1
+                    );
+                    const correctedY = Phaser.Math.Linear(paddle.y, targetCenterY, lerpAlpha);
+                    paddle.setY(correctedY);
+                }
+                return;
+            }
+
+            const deviation = Math.abs(paddle.y - targetCenterY);
+            if (deviation > REMOTE_PADDLE_EPSILON) {
+                const interpolatedY = Phaser.Math.Linear(paddle.y, targetCenterY, REMOTE_PADDLE_LERP_ALPHA);
+                paddle.setY(interpolatedY);
             }
         });
 
@@ -500,7 +521,9 @@ export default class GameScene extends Phaser.Scene {
             const dy = this.ball.y - state.ball.y;
             const positionChanged = dx * dx + dy * dy > NETWORK_POSITION_EPSILON * NETWORK_POSITION_EPSILON;
             if (positionChanged) {
-                this.ball.setPosition(state.ball.x, state.ball.y);
+                const nextX = Phaser.Math.Linear(this.ball.x, state.ball.x, BALL_LERP_ALPHA);
+                const nextY = Phaser.Math.Linear(this.ball.y, state.ball.y, BALL_LERP_ALPHA);
+                this.ball.setPosition(nextX, nextY);
             }
             this.updateScoresFromState(state);
         }

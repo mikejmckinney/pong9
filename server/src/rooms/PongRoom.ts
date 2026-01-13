@@ -39,7 +39,7 @@ export class PongRoom extends Room<GameState> {
             client.send(MESSAGE_TYPES.PONG, { timestamp: message?.timestamp ?? Date.now() });
         });
 
-        this.setSimulationInterval((deltaTime) => this.updateState(deltaTime));
+        this.setSimulationInterval((deltaTime) => this.updateState(deltaTime), 1000 / 60);
     }
 
     onJoin(client: Client) {
