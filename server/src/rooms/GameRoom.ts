@@ -276,6 +276,9 @@ export class GameRoom extends Room<GameState> {
 
   /**
    * Calculate ball bounce off paddle based on where it hits
+   * Physics: Ball deflects based on relative hit position
+   * - Hit top of paddle (ballY < paddle.y) → ball deflects upward (negative Y velocity)
+   * - Hit bottom of paddle (ballY > paddle.y) → ball deflects downward (positive Y velocity)
    */
   private calculateBounce(
     paddle: Player, 
@@ -287,13 +290,15 @@ export class GameRoom extends Room<GameState> {
     const halfBall = BALL_SIZE / 2;
 
     // Calculate relative intersection (-1 to 1)
+    // Positive = ball hit top of paddle, Negative = ball hit bottom
     const relativeIntersect = (paddle.y - ballY) / halfPaddleHeight;
     
     // Calculate bounce angle (max 60 degrees)
     const maxBounceAngle = Math.PI / 3; // 60 degrees
     const bounceAngle = relativeIntersect * maxBounceAngle;
 
-    // Current speed with slight increase (capped at 2x base speed)
+    // Current speed with 5% increase per hit (capped at 2x base speed)
+    // Speed increase makes rallies more exciting as they progress
     const currentSpeed = Math.sqrt(
       this.state.ballVelX * this.state.ballVelX + 
       this.state.ballVelY * this.state.ballVelY
@@ -301,6 +306,8 @@ export class GameRoom extends Room<GameState> {
     const newSpeed = Math.min(currentSpeed * 1.05, BALL_SPEED * 2);
 
     // Calculate new velocities
+    // X velocity: direction determines left/right movement
+    // Y velocity: negative sin because positive angle should deflect upward (negative Y in screen coords)
     const newVelX = direction * newSpeed * Math.cos(bounceAngle);
     const newVelY = -newSpeed * Math.sin(bounceAngle);
 
