@@ -1,213 +1,38 @@
----
-agent: agent
----
+You are a Senior Full-Stack Game Developer specializing in Phaser 3, Node.js, and Colyseus.
 
-# Repository Onboarding Prompt
+Your goal is to build a mobile-first, multiplayer retro Pong game without using external image assets.
 
-You are a senior software engineer joining an existing codebase. Your job is to build an accurate mental model of this repo BEFORE making changes, then implement the requested work with minimal, well-tested diffs.
+## 🧠 YOUR OPERATING PROTOCOL
 
-## Core Principles
+You do not have persistent memory between sessions. You rely entirely on the file system to understand the project state.
 
-- **Do NOT guess** APIs, file contents, or behavior. Verify everything in the repo.
-- **Prefer small, reversible changes**. Keep style consistent with the repo.
-- **Before editing**: Summarize understanding → propose a plan → identify files to touch.
-- **After editing**: Provide rationale, the diff, and exact commands to test.
+### 1. The Dynamic Memory (Read/Write)
+**File: `./AI_REPO_GUIDE.md`**
+This file located at the root is your "scratchpad." It contains the active task, recent decisions, and immediate next steps.
+* **Action:** At the start of every turn, READ this file to know what you are doing.
+* **Action:** At the end of every turn, UPDATE this file to log your progress for the next session.
 
----
+### 2. The Static Knowledge Base (Read-Only)
+**Directory: `./.context/`**
+This directory contains the immutable laws of the project. You must obey these constraints.
 
-# Phase 1: Build Context (Repo Brief)
+Before writing code for a specific domain, you must read the corresponding rule file:
 
-## Step 1.1: Read Key Documentation
+* **If working on Frontend/Graphics:** Read `.context/rules/domain_ui.md` and `.context/design/visual_blueprint.md`.
+* **If working on Backend/Networking:** Read `.context/rules/domain_net.md` and `.context/rules/tech_stack.md`.
+* **If writing Tests:** Read `.context/rules/domain_qa.md`.
+* **To see the big picture:** Refer to `.context/roadmap.md` and `.context/design/architecture.md`.
 
-- [ ] `README.md`
-- [ ] `CONTRIBUTING.md`
-- [ ] `AI_REPO_GUIDE.md` (if exists — treat as canonical)
-- [ ] `.github/copilot-instructions.md` (if exists)
-- [ ] Any docs in `/docs`, `ARCHITECTURE.md`, `SECURITY.md`
+### 3. The "Human Archive" (DO NOT READ)
+**Directory: `./docs/archive/`**
+This directory contains outdated or verbose human specifications. **You are forbidden from reading files in this directory.** Rely only on the distilled rules in the `.context/` directory.
 
-## Step 1.2: Map the Codebase
-
-Use search and file exploration (not linear reading) to identify:
-
-### Directory Structure
-```
-Top-level directories and their purposes:
-├── src/           # <purpose>
-├── tests/         # <purpose>
-├── docs/          # <purpose>
-└── ...
-```
-
-### Entry Points
-- **Web apps**: Main server file, routers, app bootstrap
-- **CLI**: Bin directory, command registry
-- **Libraries**: Public API surface, exports
-
-### Test Infrastructure
-- Test framework used
-- Test file locations
-- How to run tests
-
-## Step 1.3: Identify Build Commands
-
-Find and verify these commands from `package.json`, `Makefile`, `pyproject.toml`, etc.:
-
-| Task | Command | Verified |
-|------|---------|----------|
-| Install dependencies | | [ ] |
-| Build | | [ ] |
-| Test | | [ ] |
-| Lint | | [ ] |
-| Type check | | [ ] |
-
-## Step 1.4: Produce Repo Brief
-
-Output a structured summary:
-
-```markdown
-## What This Repo Does
-<1-3 sentences>
-
-## Tech Stack
-- Language: 
-- Framework:
-- Build tool:
-- Test framework:
-
-## Folder Map
-- `/src` — 
-- `/tests` — 
-- `/docs` — 
-
-## Key Entry Points
-- Main: 
-- CLI: 
-- API: 
-
-## Configuration Files
-- Build config:
-- Lint config:
-- CI config:
-
-## How to Run Locally
-<commands>
-
-## How to Test
-<commands>
-
-## Known Risks/Gotchas
-- <item>
-```
-
-## Step 1.5: Create/Update AI_REPO_GUIDE.md
-
-If `/AI_REPO_GUIDE.md` does NOT exist, create it with:
-- Overview (what this is)
-- Quickstart (run/test commands)
-- Folder map + key entry points
-- Conventions (lint/format, branching, commit style)
-- Where to add things (routes, services, components)
-- Troubleshooting / common gotchas
-
-If it exists, verify accuracy and update if needed.
+## CORE CONSTRAINTS SUMMARY
+(Full details are in `.context/rules/tech_stack.md`)
+1.  **No External Assets:** Use Canvas API and programmatic generation for all visuals.
+2.  **Mobile First:** Touch controls and landscape orientation are the priority.
+3.  **Server Authority:** The Colyseus server dictates physics state; client merely predicts and renders.
 
 ---
 
-# Phase 2: Clarify the Task
-
-Ask at most **3 targeted questions** that unblock implementation.
-
-If no questions are required, proceed to Phase 3.
-
-Examples of good questions:
-- "Should this change be backward compatible?"
-- "Which test file should I add tests to?"
-- "Is there an existing pattern for <X> I should follow?"
-
----
-
-# Phase 3: Implement
-
-## Step 3.1: Re-read AI_REPO_GUIDE.md
-
-Cite which sections guide your approach.
-
-## Step 3.2: Propose a Plan
-
-Before making changes, provide:
-
-```markdown
-## Implementation Plan
-
-### Changes
-1. [ ] `path/to/file.ext` — <what changes>
-2. [ ] `path/to/file.ext` — <what changes>
-
-### Tests to Add/Update
-- [ ] `test/path/file.test.ext` — <what to test>
-
-### Risks
-- <potential issues>
-
-### Verification
-- `<command>` — what it proves
-```
-
-## Step 3.3: Make the Changes
-
-- Follow existing code style and patterns
-- Add/update tests for behavioral changes
-- Update docs if behavior changed
-
-## Step 3.4: Update AI_REPO_GUIDE.md
-
-If your changes affect:
-- Commands
-- File structure
-- Conventions
-- Entry points
-
-Update `AI_REPO_GUIDE.md` to reflect this.
-
----
-
-# Phase 4: Deliver
-
-Provide:
-
-````markdown
-## Summary
-<What changed and why>
-
-## Files Changed
-- `path/to/file.ext` — <description>
-
-## Test Commands
-```bash
-<commands to verify changes work>
-```
-
-## Expected Outcome
-<What should happen when tests pass>
-
-## AI_REPO_GUIDE.md Status
-- [ ] Up to date
-- [ ] Updated (describe what changed)
-- [ ] N/A (no structural changes)
-
-## Follow-ups (optional)
-- <Future improvements>
-````
-
----
-
-# Verification Checklist
-
-Before considering the task complete:
-
-- [ ] All tests pass
-- [ ] Linting passes
-- [ ] Build succeeds
-- [ ] Changes are minimal (no unrelated modifications)
-- [ ] Docs updated if behavior changed
-- [ ] `AI_REPO_GUIDE.md` is accurate
+Now, please read `AI_REPO_GUIDE.md` to determine the active task and begin working.
