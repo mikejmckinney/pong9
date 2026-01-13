@@ -13,9 +13,13 @@ export class GameRoom extends Room<GameState> {
   // Map of session IDs to their current input
   private playerInputs = new Map<string, PlayerInput>();
   // Simulation interval handle
-  private simulationInterval: ReturnType<typeof setInterval> | null = null;
+  private simulationInterval: ReturnType<typeof setTimeout> | null = null;
   // Last tick timestamp for delta calculation
   private lastTickTime: number = 0;
+  // Expected tick interval in ms (for drift compensation)
+  private readonly tickIntervalMs: number = 1000 / SERVER_TICK_RATE;
+  // Accumulated time for drift compensation
+  private accumulatedDrift: number = 0;
 
   onCreate(): void {
     this.setState(new GameState());
@@ -35,8 +39,8 @@ export class GameRoom extends Room<GameState> {
     const playerNumber = this.playerNumbers.size === 0 ? 1 : 2;
     this.playerNumbers.set(client.sessionId, playerNumber as 1 | 2);
 
-    // Create player schema
-    const player = new Player(playerNumber === 1);
+    // Create player schema with explicit player number
+    const player = new Player(playerNumber === 1, playerNumber as 1 | 2);
     player.sessionId = client.sessionId;
     this.state.players.set(client.sessionId, player);
 
@@ -103,12 +107,39 @@ export class GameRoom extends Room<GameState> {
     // Broadcast game start to all clients
     this.broadcast('gameStart', { message: 'Game starting!' });
 
-    // Start the simulation loop at 60Hz
+    // Start the simulation loop at 60Hz using setTimeout with drift compensation
+    // This prevents timer drift that can occur with setInterval
     this.lastTickTime = Date.now();
-    this.simulationInterval = setInterval(() => this.tick(), 1000 / SERVER_TICK_RATE);
+    this.accumulatedDrift = 0;
+    this.scheduleNextTick();
 
     // Launch ball after a short delay (1 second)
     setTimeout(() => this.launchBall(), 1000);
+  }
+
+  /**
+   * Schedule the next tick with drift compensation
+   * Uses setTimeout instead of setInterval to prevent accumulated drift
+   */
+  private scheduleNextTick(): void {
+    if (this.state.phase !== GamePhase.PLAYING) return;
+
+    const now = Date.now();
+    const elapsed = now - this.lastTickTime;
+    
+    // Calculate drift: how much we're off from the expected interval
+    const drift = elapsed - this.tickIntervalMs;
+    this.accumulatedDrift += drift;
+
+    // Compensate for drift in the next tick timing
+    const nextTickDelay = Math.max(1, this.tickIntervalMs - this.accumulatedDrift);
+    
+    // Reset accumulated drift if it's been compensated
+    if (this.accumulatedDrift > 0) {
+      this.accumulatedDrift = Math.max(0, this.accumulatedDrift - (this.tickIntervalMs - nextTickDelay));
+    }
+
+    this.simulationInterval = setTimeout(() => this.tick(), nextTickDelay);
   }
 
   /**
@@ -127,6 +158,9 @@ export class GameRoom extends Room<GameState> {
 
     // Ball physics will be implemented in Phase 3
     // For now, just update player positions based on inputs
+
+    // Schedule the next tick with drift compensation
+    this.scheduleNextTick();
   }
 
   /**
@@ -185,7 +219,7 @@ export class GameRoom extends Room<GameState> {
    */
   private stopSimulation(): void {
     if (this.simulationInterval) {
-      clearInterval(this.simulationInterval);
+      clearTimeout(this.simulationInterval);
       this.simulationInterval = null;
     }
   }

@@ -142,14 +142,43 @@ export class LobbyScene extends Phaser.Scene {
   }
 
   private getServerUrl(): string {
-    // In production, this would come from environment config
-    // For local development, use localhost
-    const hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      return 'ws://localhost:2567';
+    // Check for environment-configured server URL first (set at build time via Vite)
+    const envServerUrl = (import.meta as ImportMeta & { env?: { VITE_SERVER_URL?: string } }).env?.VITE_SERVER_URL;
+    if (envServerUrl) {
+      return envServerUrl;
     }
-    // For deployed environments, assume server is on same host
-    return `wss://${hostname}:2567`;
+
+    // Check for runtime override (useful for testing different server configurations)
+    const runtimeOverride = (window as Window & { __PONG9_SERVER_URL__?: string }).__PONG9_SERVER_URL__;
+    if (runtimeOverride) {
+      return runtimeOverride;
+    }
+
+    // Default configuration based on hostname
+    const hostname = window.location.hostname;
+    
+    // Determine port from environment or default to 2567
+    let port = 2567;
+    const envPort = (import.meta as ImportMeta & { env?: { VITE_SERVER_PORT?: string } }).env?.VITE_SERVER_PORT;
+    if (envPort) {
+      const numericPort = parseInt(envPort, 10);
+      if (Number.isFinite(numericPort) && numericPort > 0 && numericPort < 65536) {
+        port = numericPort;
+      }
+    }
+
+    const isLocal = hostname === 'localhost' || hostname === '127.0.0.1';
+    const protocol = isLocal ? 'ws' : 'wss';
+
+    // For local development, use localhost with configured port
+    // For deployed environments, assume server is on same host (proxy may handle port mapping)
+    if (isLocal) {
+      return `${protocol}://${hostname}:${port}`;
+    }
+    
+    // For production, use the location host (allows reverse proxy to handle routing)
+    // If no proxy is configured, fall back to explicit port
+    return `${protocol}://${hostname}:${port}`;
   }
 
   private async onConnectClick(): Promise<void> {

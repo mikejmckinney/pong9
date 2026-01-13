@@ -10,12 +10,14 @@ export class Player extends Schema {
   @type('number') y: number;
   @type('string') sessionId: string = '';
   @type('boolean') connected: boolean = true;
+  @type('uint8') playerNumber: 1 | 2;
 
-  constructor(isPlayer1: boolean) {
+  constructor(isPlayer1: boolean, playerNumber: 1 | 2) {
     super();
     // Position paddles at opposite sides
     this.x = isPlayer1 ? PADDLE_OFFSET : GAME_WIDTH - PADDLE_OFFSET;
     this.y = GAME_HEIGHT / 2;
+    this.playerNumber = playerNumber;
   }
 
   /**

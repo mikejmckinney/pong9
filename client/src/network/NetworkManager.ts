@@ -34,6 +34,7 @@ export interface PlayerSnapshot {
   y: number;
   sessionId: string;
   connected: boolean;
+  playerNumber: 1 | 2;
 }
 
 /**
@@ -184,16 +185,21 @@ export class NetworkManager {
   private setupStateHandler(): void {
     if (!this.room) return;
 
+    // Track whether we've already notified the player number
+    let hasNotifiedPlayerNumber = false;
+
     // Track state changes
     this.room.onStateChange((state) => {
-      // Determine player number based on session ID position
-      const playerIds = Array.from(state.players.keys());
-      const playerIndex = playerIds.indexOf(this.sessionId);
-      this.playerNumber = (playerIndex === 0 ? 1 : 2) as 1 | 2;
+      // Determine player number from the player's state object (more robust than map order)
+      const player = state.players.get(this.sessionId);
+      if (player?.playerNumber && this.playerNumber !== player.playerNumber) {
+        this.playerNumber = player.playerNumber as 1 | 2;
+      }
 
-      // First connection - notify player number
-      if (state.phase === GamePhase.WAITING || state.phase === GamePhase.PLAYING) {
-        if (playerIds.length > 0 && playerIndex !== -1) {
+      // First connection - notify player number (only once)
+      if (!hasNotifiedPlayerNumber && player?.playerNumber) {
+        if (state.phase === GamePhase.WAITING || state.phase === GamePhase.PLAYING) {
+          hasNotifiedPlayerNumber = true;
           this.callbacks.onConnected?.(this.playerNumber);
         }
       }
@@ -207,7 +213,7 @@ export class NetworkManager {
   private stateToSnapshot(state: unknown): GameStateSnapshot {
     // Type assertion for Colyseus state
     const s = state as {
-      players: Map<string, { x: number; y: number; sessionId: string; connected: boolean }>;
+      players: Map<string, { x: number; y: number; sessionId: string; connected: boolean; playerNumber: 1 | 2 }>;
       ballX: number;
       ballY: number;
       ballVelX: number;
@@ -225,6 +231,7 @@ export class NetworkManager {
         y: player.y,
         sessionId: player.sessionId,
         connected: player.connected,
+        playerNumber: player.playerNumber,
       });
     });
 

@@ -490,8 +490,27 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
-    // Touch input handled by TouchInputManager, we just need to send the intent
-    // In Phase 3, we'll refactor to separate touch intent capture
+    // If no keyboard input, check for touch input for the current player
+    if (input === 'NONE') {
+      const playerSide = playerNumber === 1 ? 'left' : 'right';
+      const screenSplitX = this.scale.width / 2;
+      const screenCenterY = this.scale.height / 2;
+
+      // Check all active pointers for touch input
+      for (const pointer of this.input.manager.pointers) {
+        if (!pointer.isDown) continue;
+
+        const currentSide = pointer.x < screenSplitX ? 'left' : 'right';
+        if (currentSide === playerSide) {
+          if (pointer.y < screenCenterY) {
+            input = 'UP';
+          } else {
+            input = 'DOWN';
+          }
+          break; // Found an active touch for this player
+        }
+      }
+    }
     
     this.networkManager.sendInput(input);
   }
