@@ -25,9 +25,22 @@ export class PongRoom extends Room<GameState> {
     }
 
     onJoin(client: Client) {
+        // Get available side with error handling
+        // While maxClients=2 should prevent overflow, this guards against edge cases
+        // (e.g., reconnection logic, future maxClients changes)
+        let side: PlayerSide;
+        try {
+            side = this.getAvailableSide();
+        } catch (error) {
+            console.error('Failed to assign player side:', error);
+            // Disconnect the client if no side is available
+            client.leave();
+            return;
+        }
+
         const player = new PlayerState();
         player.sessionId = client.sessionId;
-        player.side = this.getAvailableSide();
+        player.side = side;
         this.state.players.set(client.sessionId, player);
         this.playerDirections.set(client.sessionId, 'stop');
 

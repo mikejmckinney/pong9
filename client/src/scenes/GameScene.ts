@@ -9,7 +9,8 @@ import {
     BALL_LAUNCH_DELAY_MS,
     MAX_BOUNCE_ANGLE_SPEED,
     BLOOM_STRENGTH,
-    BLOOM_BLUR_STRENGTH
+    BLOOM_BLUR_STRENGTH,
+    PADDLE_HEIGHT
 } from '../config/constants';
 import Paddle from '../objects/Paddle';
 import Ball from '../objects/Ball';
@@ -230,6 +231,10 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handleStopInput(paddle: Paddle) {
+        // Always stop the paddle to prevent velocity persistence when network mode changes
+        // (e.g., transitioning from offline to online mode mid-touch)
+        this.applyLocalMovement(paddle, 'stop');
+
         if (!this.canHandleInput(paddle)) {
             return;
         }
@@ -237,8 +242,6 @@ export default class GameScene extends Phaser.Scene {
         if (this.isNetworkControlledPaddle(paddle)) {
             this.sendNetworkInput('stop');
         }
-
-        paddle.stopMovement();
     }
 
     private applyLocalMovement(paddle: Paddle, direction: InputDirection) {
@@ -251,12 +254,20 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
+    /**
+     * Helper method to get a paddle by player side.
+     * Centralizes the mapping from PlayerSide to Paddle instance.
+     */
+    private getPaddleBySide(side: PlayerSide): Paddle {
+        return side === 'left' ? this.paddle1 : this.paddle2;
+    }
+
     private isLocalPaddle(paddle: Paddle): boolean {
         if (!this.localSide) {
             return false;
         }
 
-        return (this.localSide === 'left' && paddle === this.paddle1) || (this.localSide === 'right' && paddle === this.paddle2);
+        return paddle === this.getPaddleBySide(this.localSide);
     }
 
     private canHandleInput(paddle: Paddle): boolean {
@@ -351,6 +362,13 @@ export default class GameScene extends Phaser.Scene {
                 return;
             }
 
+            // Initialize localSide immediately from initial room state to prevent
+            // input unresponsiveness while waiting for first onStateChange
+            const localPlayer = this.networkRoom.state.players.get(this.networkRoom.sessionId);
+            if (localPlayer) {
+                this.localSide = localPlayer.side;
+            }
+
             // Simplified state change handler - state is guaranteed by Colyseus
             this.networkRoom.onStateChange((state) => {
                 this.syncNetworkState(state);
@@ -419,18 +437,29 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private syncNetworkState(state: GameState) {
+        // Guard against race condition if room disconnects during state update
+        if (!this.networkRoom) {
+            return;
+        }
+
         state.players.forEach((player, sessionId) => {
-            const isLocalPlayer = this.networkRoom && sessionId === this.networkRoom.sessionId;
+            const isLocalPlayer = sessionId === this.networkRoom!.sessionId;
             if (isLocalPlayer) {
                 if (!this.localSide) {
                     this.localSide = player.side;
                 }
+                // Skip syncing local player position - use client-side prediction
+                // Phase 3 will add reconciliation when deviation exceeds threshold
                 return;
             }
 
-            const paddle = player.side === 'left' ? this.paddle1 : this.paddle2;
+            // Convert server's top-edge Y to Phaser's center-based Y coordinate
+            // Server stores paddle position as top edge (clamped to [0, GAME_HEIGHT - PADDLE_HEIGHT])
+            // Phaser sprites use center-based coordinates
+            const centerY = player.y + PADDLE_HEIGHT / 2;
+            const paddle = this.getPaddleBySide(player.side);
             if (paddle) {
-                paddle.setY(player.y);
+                paddle.setY(centerY);
             }
         });
     }

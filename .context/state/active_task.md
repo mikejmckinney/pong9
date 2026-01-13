@@ -11,7 +11,7 @@
   - ✅ Colyseus server defined with per-room input queues and player side assignment
   - ✅ Client joins room, shows waiting/online status, sends paddle inputs, and mirrors paddle positions from server state
   - ✅ Ping/Pong health-check wiring in place
-  - ⏳ Server still simulates paddles only; ball physics/scoring remain client-side until Phase 3
+  - ⏳ Server currently syncs/simulates paddles only. Each client runs its own local ball physics and scoring using its own paddle state; server paddle positions are not yet used for ball or score calculations, so ball positions/scores may diverge between clients. True shared/authoritative ball physics will be introduced in Phase 3.
 * Build system: Vite with TypeScript strict mode
 * All game objects created procedurally (no external image assets)
 * Known bugs: None currently recorded
