@@ -30,6 +30,13 @@ export class GameScene extends Phaser.Scene {
   private gameOver = false;
   private winnerText?: Phaser.GameObjects.Text;
   private restartText?: Phaser.GameObjects.Text;
+  private keyboardKeys?: {
+    p1Up: Phaser.Input.Keyboard.Key;
+    p1Down: Phaser.Input.Keyboard.Key;
+    p2Up: Phaser.Input.Keyboard.Key;
+    p2Down: Phaser.Input.Keyboard.Key;
+    restart: Phaser.Input.Keyboard.Key;
+  };
 
   constructor() {
     super('GameScene');
@@ -161,8 +168,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private setupKeyboardControls(): void {
-    // Desktop keyboard controls for testing
-    const keys = this.input.keyboard?.addKeys({
+    // Desktop keyboard controls for testing - store as instance variable
+    this.keyboardKeys = this.input.keyboard?.addKeys({
       p1Up: Phaser.Input.Keyboard.KeyCodes.W,
       p1Down: Phaser.Input.Keyboard.KeyCodes.S,
       p2Up: Phaser.Input.Keyboard.KeyCodes.UP,
@@ -176,9 +183,9 @@ export class GameScene extends Phaser.Scene {
       restart: Phaser.Input.Keyboard.Key;
     };
 
-    if (keys) {
+    if (this.keyboardKeys) {
       this.input.keyboard?.on('keydown', () => {
-        if (this.gameOver && keys.restart.isDown) {
+        if (this.gameOver && this.keyboardKeys?.restart.isDown) {
           this.restartGame();
         }
       });
@@ -344,31 +351,19 @@ export class GameScene extends Phaser.Scene {
     // Update touch input
     this.touchInput.update();
 
-    // Handle keyboard input for desktop testing
-    const keys = this.input.keyboard?.addKeys({
-      p1Up: Phaser.Input.Keyboard.KeyCodes.W,
-      p1Down: Phaser.Input.Keyboard.KeyCodes.S,
-      p2Up: Phaser.Input.Keyboard.KeyCodes.UP,
-      p2Down: Phaser.Input.Keyboard.KeyCodes.DOWN,
-    }) as {
-      p1Up: Phaser.Input.Keyboard.Key;
-      p1Down: Phaser.Input.Keyboard.Key;
-      p2Up: Phaser.Input.Keyboard.Key;
-      p2Down: Phaser.Input.Keyboard.Key;
-    } | undefined;
-
-    if (keys) {
+    // Handle keyboard input for desktop testing (use stored keys from create)
+    if (this.keyboardKeys) {
       // Player 1 keyboard controls
-      if (keys.p1Up.isDown) {
+      if (this.keyboardKeys.p1Up.isDown) {
         this.paddle1.moveUp(delta, PADDLE_SPEED);
-      } else if (keys.p1Down.isDown) {
+      } else if (this.keyboardKeys.p1Down.isDown) {
         this.paddle1.moveDown(delta, PADDLE_SPEED, height);
       }
 
       // Player 2 keyboard controls
-      if (keys.p2Up.isDown) {
+      if (this.keyboardKeys.p2Up.isDown) {
         this.paddle2.moveUp(delta, PADDLE_SPEED);
-      } else if (keys.p2Down.isDown) {
+      } else if (this.keyboardKeys.p2Down.isDown) {
         this.paddle2.moveDown(delta, PADDLE_SPEED, height);
       }
     }
