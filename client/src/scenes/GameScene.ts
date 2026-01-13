@@ -17,6 +17,9 @@ import Ball from '../objects/Ball';
 import { Client, Room } from 'colyseus.js';
 import { MESSAGE_TYPES, ROOM_NAME, type GamePhase, type InputDirection, type PlayerSide } from '@shared/messages';
 import type { GameState } from '@shared/GameState';
+import { getPlayerBySide } from '@shared/playerUtils';
+
+const NETWORK_POSITION_EPSILON = 0.5;
 
 export default class GameScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
@@ -40,6 +43,10 @@ export default class GameScene extends Phaser.Scene {
     private pingTimer?: Phaser.Time.TimerEvent;
     private localSide?: PlayerSide;
     private lastInputDirection?: InputDirection;
+    private useNetworkBall: boolean = false;
+    private localLaunchTimer?: Phaser.Time.TimerEvent;
+    private paddle1Collider?: Phaser.Physics.Arcade.Collider;
+    private paddle2Collider?: Phaser.Physics.Arcade.Collider;
 
     constructor() {
         super('GameScene');
@@ -90,7 +97,10 @@ export default class GameScene extends Phaser.Scene {
 
         // Reset ball to start
         this.isResettingBall = true;
-        this.time.delayedCall(BALL_LAUNCH_DELAY_MS, () => {
+        this.localLaunchTimer = this.time.delayedCall(BALL_LAUNCH_DELAY_MS, () => {
+            if (this.useNetworkBall) {
+                return;
+            }
             this.ball.launch();
             this.isResettingBall = false;
         });
@@ -100,6 +110,12 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update() {
+        if (this.useNetworkBall) {
+            this.paddle1.update();
+            this.paddle2.update();
+            return;
+        }
+
         // Update ball (handles top/bottom wall bouncing)
         this.ball.update();
 
@@ -288,11 +304,12 @@ export default class GameScene extends Phaser.Scene {
 
     private setupCollisions() {
         // Ball collides with paddles - adjust angle based on hit position
-        this.physics.add.collider(this.ball, this.paddle1, (ballObj, paddleObj) => {
+        // Store colliders as class properties so they can be toggled in network mode
+        this.paddle1Collider = this.physics.add.collider(this.ball, this.paddle1, (ballObj, paddleObj) => {
             this.handlePaddleCollision(ballObj as Ball, paddleObj as Paddle);
         });
 
-        this.physics.add.collider(this.ball, this.paddle2, (ballObj, paddleObj) => {
+        this.paddle2Collider = this.physics.add.collider(this.ball, this.paddle2, (ballObj, paddleObj) => {
             this.handlePaddleCollision(ballObj as Ball, paddleObj as Paddle);
         });
     }
@@ -322,7 +339,11 @@ export default class GameScene extends Phaser.Scene {
     private resetBall() {
         this.isResettingBall = true;
         this.ball.reset();
-        this.time.delayedCall(BALL_LAUNCH_DELAY_MS, () => {
+        this.localLaunchTimer?.remove();
+        this.localLaunchTimer = this.time.delayedCall(BALL_LAUNCH_DELAY_MS, () => {
+            if (this.useNetworkBall) {
+                return;
+            }
             this.ball.launch();
             this.isResettingBall = false;
         });
@@ -369,6 +390,8 @@ export default class GameScene extends Phaser.Scene {
                 this.localSide = localPlayer.side;
             }
 
+            this.setNetworkBallMode(true);
+
             // Simplified state change handler - state is guaranteed by Colyseus
             this.networkRoom.onStateChange((state) => {
                 this.syncNetworkState(state);
@@ -387,6 +410,11 @@ export default class GameScene extends Phaser.Scene {
                 this.lastInputDirection = undefined;
                 this.pingTimer?.remove();
                 this.pingTimer = undefined;
+                this.setNetworkBallMode(false);
+                this.score1 = 0;
+                this.score2 = 0;
+                this.score1Text.setText('0');
+                this.score2Text.setText('0');
                 if (this.networkStatusText) {
                     this.networkStatusText.setText('Disconnected: local play');
                 }
@@ -462,6 +490,16 @@ export default class GameScene extends Phaser.Scene {
                 paddle.setY(centerY);
             }
         });
+
+        if (this.useNetworkBall) {
+            const dx = this.ball.x - state.ball.x;
+            const dy = this.ball.y - state.ball.y;
+            const positionChanged = dx * dx + dy * dy > NETWORK_POSITION_EPSILON * NETWORK_POSITION_EPSILON;
+            if (positionChanged) {
+                this.ball.setPosition(state.ball.x, state.ball.y);
+            }
+            this.updateScoresFromState(state);
+        }
     }
 
     private sendNetworkInput(direction: InputDirection) {
@@ -475,6 +513,64 @@ export default class GameScene extends Phaser.Scene {
 
         this.lastInputDirection = direction;
         this.networkRoom.send(MESSAGE_TYPES.INPUT, { direction });
+    }
+
+    private setNetworkBallMode(enabled: boolean) {
+        if (this.useNetworkBall === enabled) {
+            return;
+        }
+
+        this.useNetworkBall = enabled;
+        const body = this.ball.body as Phaser.Physics.Arcade.Body | null;
+
+        // Toggle ball-paddle colliders to prevent local collision logic from
+        // interfering with server-authoritative state during online play.
+        // This fixes visual "jumps" when server state corrects the ball position.
+        if (this.paddle1Collider) {
+            this.paddle1Collider.active = !enabled;
+        }
+        if (this.paddle2Collider) {
+            this.paddle2Collider.active = !enabled;
+        }
+
+        if (enabled) {
+            this.localLaunchTimer?.remove();
+            this.localLaunchTimer = undefined;
+            this.isResettingBall = false;
+            this.ball.reset();
+            if (body) {
+                body.setVelocity(0, 0);
+                body.moves = false;
+                body.setImmovable(true);
+            }
+            return;
+        }
+
+        if (body) {
+            body.moves = true;
+            body.setImmovable(false);
+            body.setVelocity(0, 0);
+        }
+        this.resetBall();
+    }
+
+    private updateScoresFromState(state: GameState) {
+        const leftPlayer = getPlayerBySide(state.players, 'left');
+        const rightPlayer = getPlayerBySide(state.players, 'right');
+
+        // Left player maps to P1 (cyan) score1; right player maps to P2 (pink) score2
+        const nextScore1 = leftPlayer?.score ?? 0;
+        const nextScore2 = rightPlayer?.score ?? 0;
+
+        if (nextScore1 !== this.score1) {
+            this.score1 = nextScore1;
+            this.score1Text.setText(this.score1.toString());
+        }
+
+        if (nextScore2 !== this.score2) {
+            this.score2 = nextScore2;
+            this.score2Text.setText(this.score2.toString());
+        }
     }
 
     private sendPing() {

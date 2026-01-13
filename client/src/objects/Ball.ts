@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { BALL_SIZE, BALL_SPEED, GAME_HEIGHT } from '../config/constants';
+import { BALL_SIZE, BALL_SPEED, GAME_HEIGHT, SERVE_ANGLE_HALF_RANGE_DEG, SERVE_DIRECTION_THRESHOLD } from '../config/constants';
 
 export default class Ball extends Phaser.Physics.Arcade.Sprite {
     constructor(scene: Phaser.Scene, x: number, y: number, color: number) {
@@ -48,9 +48,9 @@ export default class Ball extends Phaser.Physics.Arcade.Sprite {
 
     launch() {
         // Random direction (left or right)
-        const direction = Phaser.Math.Between(0, 1) === 0 ? -1 : 1;
+        const direction = Phaser.Math.FloatBetween(0, 1) < SERVE_DIRECTION_THRESHOLD ? -1 : 1;
         // Random angle between -45 and 45 degrees
-        const angle = Phaser.Math.Between(-45, 45);
+        const angle = Phaser.Math.FloatBetween(-SERVE_ANGLE_HALF_RANGE_DEG, SERVE_ANGLE_HALF_RANGE_DEG);
         
         const velocity = this.scene.physics.velocityFromAngle(angle, BALL_SPEED);
         this.setVelocity(velocity.x * direction, velocity.y);
