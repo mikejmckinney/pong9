@@ -2,9 +2,9 @@
 
 ## What This Repo Does
 
-This is a **template repository** for building a mobile-first multiplayer Pong game with a Retro Synthwave aesthetic. The repository provides AI agent configurations, onboarding prompts, and structural conventions to facilitate rapid development of a Phaser 3 (client) + Node.js/Colyseus (server) game architecture.
+This is a mobile-first multiplayer Pong game with a Retro Synthwave aesthetic, built with Phaser 3 (client) and Node.js/Colyseus (server). The repository provides AI agent configurations, onboarding prompts, and structural conventions to facilitate rapid development.
 
-**Current Status:** Pre-development template phase. The repository contains agent instructions, style guides, and architectural documentation but no actual game implementation yet.
+**Current Status:** Phase 1 - The Core Loop (Local Prototype) implementation complete. The client-side game is functional with Phaser 3, synthwave visuals, physics, and mobile touch controls. Server implementation (Phases 2-4) is pending.
 
 ## Tech Stack
 
@@ -46,22 +46,37 @@ This is a **template repository** for building a mobile-first multiplayer Pong g
 │   │   ├── repo-onboarding.md    # General repository onboarding workflow
 │   │   └── copilot-onboarding.md # Copilot-specific setup instructions
 │   └── copilot-instructions.md   # GitHub Copilot agent instructions
+├── client/               # Phaser 3 frontend (Phase 1 complete)
+│   ├── src/
+│   │   ├── config/      # Game configuration and constants
+│   │   ├── objects/     # Game objects (Paddle, Ball)
+│   │   ├── scenes/      # Phaser scenes (GameScene)
+│   │   └── main.ts      # Entry point
+│   ├── index.html       # HTML entry with mobile viewport
+│   ├── package.json     # Client dependencies
+│   ├── tsconfig.json    # TypeScript configuration
+│   └── vite.config.ts   # Vite build configuration
+├── server/               # Node.js + Colyseus backend (planned)
+├── shared/               # Shared TypeScript interfaces (planned)
 ├── AGENTS.md             # Canonical agent documentation (primary reference)
 ├── AGENT.md              # Deprecated, redirects to AGENTS.md
 ├── install.sh            # Codespace setup script (VS Code extensions + prompts)
 └── test.sh               # Template verification script
 ```
 
-**Note:** `/client`, `/server`, and `/shared` directories are planned but not yet created.
-
 ## Key Entry Points
 
-**Current State:** This is a template repository. No main application entry points exist yet.
+**Client (Phase 1 - Complete):**
+- **Main Entry:** `/client/src/main.ts` - Phaser game initialization, orientation check, audio context unlock
+- **Game Configuration:** `/client/src/config/gameConfig.ts` - Phaser config with scale settings
+- **Game Scene:** `/client/src/scenes/GameScene.ts` - Main gameplay scene with visuals and physics
+- **HTML Entry:** `/client/index.html` - Mobile-optimized HTML with landscape enforcement
 
-**Planned Entry Points:**
-- **Client:** Will be in `/client` directory (Phaser 3 bootstrap)
-- **Server:** Will be in `/server` directory (Colyseus server initialization)
-- **Shared:** Will be in `/shared` directory (TypeScript interfaces)
+**Server (Planned):**
+- Will be in `/server` directory (Colyseus server initialization)
+
+**Shared (Planned):**
+- Will be in `/shared` directory (TypeScript interfaces)
 
 ## Configuration Files
 
@@ -90,6 +105,29 @@ This script:
 - Copies AI prompts to `.github/prompts/`
 - Sets up the development workspace
 
+### Run the Client (Phase 1)
+
+```bash
+# Navigate to client directory
+cd client
+
+# Install dependencies (first time only)
+npm install
+
+# Run development server
+npm run dev
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+The dev server runs on `http://localhost:3000`. Open in a browser to play the game.
+
+**Mobile Testing:** For best experience, test on an actual mobile device in landscape mode or use browser DevTools device emulation.
+
 ### Verify Template Structure
 
 ```bash
@@ -99,9 +137,9 @@ bash test.sh
 
 Expected output: All required files should exist and pass validation checks.
 
-**Note:** No client/server applications exist yet to run. This repository is in the template/setup phase.
-
 ## How to Test
+
+### Template Verification
 
 ```bash
 # Verify template structure and file integrity
@@ -115,6 +153,29 @@ The test script checks for:
 - Markdown structure
 
 **Expected Result:** Test should pass with all checks green, possibly with warnings.
+
+### Client Testing (Phase 1)
+
+```bash
+# Build the client to check for TypeScript errors
+cd client
+npm run build
+```
+
+**Expected Result:** Build should succeed without errors.
+
+**Manual Testing:**
+1. Run `npm run dev` to start the development server
+2. Open `http://localhost:3000` in a browser
+3. Test touch controls:
+   - Touch left half of screen to move Player 1 paddle (cyan)
+   - Touch right half of screen to move Player 2 paddle (pink)
+   - Touch upper half to move up, lower half to move down
+4. Verify game mechanics:
+   - Ball bounces off paddles and walls
+   - Scoring works when ball goes off screen
+   - Synthwave visuals with bloom glow effect
+   - Landscape orientation enforcement (rotate device message in portrait mode)
 
 ## Architectural Conventions
 
@@ -215,15 +276,27 @@ From `.context/roadmap.md`:
 
 ## Where to Add Things
 
-**Note:** Project structure not yet created. When implemented:
+**Client (Phase 1 - Active):**
+- **New Scenes** → `/client/src/scenes/` (e.g., MenuScene, GameOverScene)
+- **New Game Objects** → `/client/src/objects/` (e.g., PowerUp, Particle effects)
+- **Client Input Logic** → Add to scenes or create `/client/src/input/`
+- **Configuration Changes** → `/client/src/config/constants.ts` or `gameConfig.ts`
+- **Styles** → Update `/client/index.html` `<style>` section
 
-- **New UI Components** → `/client/src/scenes/` (Phaser scenes)
-- **Client Input Logic** → `/client/src/input/` 
+**Server (Phases 2-3 - Planned):**
 - **Server Game Logic** → `/server/src/rooms/` (Colyseus rooms)
-- **Shared Types** → `/shared/` (TypeScript interfaces)
+- **Server Configuration** → `/server/src/config/`
+
+**Shared (Phases 2+ - Planned):**
+- **Shared Types** → `/shared/` (TypeScript interfaces for network state)
+
+**Testing (Phase 1+ - Planned):**
 - **Tests** → Mirror source structure (`/client/tests/`, `/server/tests/`)
-- **Configuration** → Root-level config files
+
+**Configuration & Documentation:**
+- **Root Config Files** → Project root (package.json, tsconfig.json, etc.)
 - **Agent Instructions** → `.context/rules/` or `.github/agents/`
+- **Documentation Updates** → This file (`AI_REPO_GUIDE.md`), README.md, AGENTS.md
 
 ## Known Risks/Gotchas
 
