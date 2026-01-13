@@ -1,0 +1,24 @@
+{
+  "name": "pong9-server",
+  "version": "0.1.0",
+  "description": "Colyseus server for Pong9",
+  "main": "dist/server/src/index.js",
+  "scripts": {
+    "dev": "ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/server/src/index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@colyseus/schema": "3.0.76",
+    "@colyseus/ws-transport": "0.16.5",
+    "colyseus": "0.16.5"
+  },
+  "devDependencies": {
+    "@types/node": "25.0.8",
+    "ts-node": "10.9.2",
+    "typescript": "5.9.3"
+  }
+}

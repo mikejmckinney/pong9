@@ -4,7 +4,7 @@ A mobile-first multiplayer Pong game with a Retro Synthwave aesthetic, built wit
 
 ## 🎮 Project Status
 
-**Current Phase:** Phase 1 - The Core Loop ✅ **COMPLETE**
+**Current Phase:** Phase 1 - The Core Loop ✅ **COMPLETE** (Phase 2 networking scaffolding in progress)
 
 The game client is fully functional with:
 - ✅ Phaser 3 game engine with TypeScript
@@ -37,6 +37,16 @@ Then open http://localhost:3000 in your browser!
 - Touch the **left half** of the screen to control the **cyan paddle** (Player 1)
 - Touch the **right half** of the screen to control the **pink paddle** (Player 2)
 - Touch **upper half** to move **up**, **lower half** to move **down**
+
+### Run the Colyseus server (Phase 2 scaffolding)
+
+```bash
+cd pong9/server
+npm install
+npm run dev   # starts on ws://localhost:2567
+```
+
+The client auto-connects to `ws://<host>:2567` by default. Override with `VITE_COLYSEUS_ENDPOINT` if the server runs elsewhere.
 
 ### For AI Agents
 

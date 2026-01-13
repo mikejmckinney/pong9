@@ -4,7 +4,7 @@
 
 This is a mobile-first multiplayer Pong game with a Retro Synthwave aesthetic, built with Phaser 3 (client) and Node.js/Colyseus (server). The repository provides AI agent configurations, onboarding prompts, and structural conventions to facilitate rapid development.
 
-**Current Status:** Phase 1 - The Core Loop (Local Prototype) implementation complete. The client-side game is functional with Phaser 3, synthwave visuals, physics, and mobile touch controls. Server implementation (Phases 2-4) is pending.
+**Current Status:** Phase 1 - The Core Loop (Local Prototype) implementation complete. Phase 2 networking scaffolding is in progress with a Colyseus server, shared schemas, and a client connection status overlay. The client-side game remains fully playable locally with Phaser 3, synthwave visuals, physics, and mobile touch controls.
 
 ## Tech Stack
 
@@ -127,6 +127,16 @@ npm run preview
 The dev server runs on `http://localhost:3000`. Open in a browser to play the game.
 
 **Mobile Testing:** For best experience, test on an actual mobile device in landscape mode or use browser DevTools device emulation.
+
+### Run the Server (Phase 2 scaffolding)
+
+```bash
+cd server
+npm install
+npm run dev # defaults to ws://localhost:2567
+```
+
+The client auto-connects to `ws://<host>:2567`. Override with `VITE_COLYSEUS_ENDPOINT` when pointing at a remote Colyseus host.
 
 ### Verify Template Structure
 
