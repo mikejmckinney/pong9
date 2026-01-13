@@ -277,7 +277,7 @@ From `.context/roadmap.md`:
 
 **Problem:** `.github/copilot-instructions.md` doesn't have repo-specific details
 
-**Solution:** This is expected initially. After creating AI_REPO_GUIDE.md, follow `.github/prompts/copilot-onboarding.md` to update it with specific commands and conventions.
+**Solution:** Follow `.github/prompts/copilot-onboarding.md` to update it with specific commands and conventions after AI_REPO_GUIDE.md is created and accurate.
 
 ### Agent State is Unclear
 

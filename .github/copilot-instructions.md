@@ -107,7 +107,7 @@ Every interaction must follow this loop:
 
 ### Template Phase
 1. **No codebase yet** - This is a template repository. Client/server directories don't exist yet.
-2. **AI_REPO_GUIDE.md is required** - Agents must read this file first. It was just created during onboarding.
+2. **AI_REPO_GUIDE.md is required** - Agents must read this file first. It contains comprehensive repository documentation.
 3. **test.sh expects specific files** - Don't remove template files without updating the test script.
 4. **Multiple agent configurations** - Different tools (.cursor, .gemini, .github) have their own config files.
 
