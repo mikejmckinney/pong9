@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# TypeScript build output in shared (transpiled JS)
+shared/*.js
+shared/*.js.map
+shared/*.d.ts
+shared/dist/
+
+# Server build output
+server/dist/
+
+# Client build output
+client/dist/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local env files
+*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Package lock files in root (use workspace ones)
+package-lock.json
