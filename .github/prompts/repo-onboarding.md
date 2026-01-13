@@ -19,7 +19,7 @@ This directory contains the immutable laws of the project. You must obey these c
 Before writing code for a specific domain, you must read the corresponding rule file:
 
 * **If working on Frontend/Graphics:** Read `.context/rules/domain_ui.md` and `.context/design/visual_blueprint.md`.
-* **If working on Backend/Networking:** Read `.context/rules/domain_net.md` and `.context/rules/tech_stack.md`.
+* **If working on backend/networking:** Read `.context/rules/domain_net.md` and `.context/rules/tech_stack.md`.
 * **If writing Tests:** Read `.context/rules/domain_qa.md`.
 * **To see the big picture:** Refer to `.context/roadmap.md` and `.context/design/architecture.md`.
 
