@@ -90,6 +90,10 @@ export class PongRoom extends Room<GameState> {
             return 'left';
         }
 
-        return 'right';
+        if (!usedSides.has('right')) {
+            return 'right';
+        }
+
+        throw new Error('No available player sides for this room');
     }
 }

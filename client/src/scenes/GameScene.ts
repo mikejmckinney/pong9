@@ -431,7 +431,6 @@ export default class GameScene extends Phaser.Scene {
             const paddle = player.side === 'left' ? this.paddle1 : this.paddle2;
             if (paddle) {
                 paddle.setY(player.y);
-                paddle.setVelocity(0, 0);
             }
         });
     }
