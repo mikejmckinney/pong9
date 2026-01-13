@@ -546,13 +546,12 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private findPlayerBySide(state: GameState, side: PlayerSide): PlayerState | undefined {
-        let match: PlayerState | undefined;
-        state.players.forEach((player) => {
+        for (const player of state.players.values()) {
             if (player.side === side) {
-                match = player;
+                return player;
             }
-        });
-        return match;
+        }
+        return undefined;
     }
 
     private sendPing() {

@@ -266,12 +266,11 @@ export class PongRoom extends Room<GameState> {
     }
 
     private getPlayerBySide(side: PlayerSide): PlayerState | undefined {
-        let found: PlayerState | undefined;
-        this.state.players.forEach((player) => {
+        for (const player of this.state.players.values()) {
             if (player.side === side) {
-                found = player;
+                return player;
             }
-        });
-        return found;
+        }
+        return undefined;
     }
 }
