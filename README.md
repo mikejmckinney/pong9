@@ -31,6 +31,9 @@ bash test.sh
 
 ```
 ├── .context/              # Agent memory and architectural rules
+│   ├── rules/            # Domain-specific architectural rules
+│   ├── state/            # Current project state
+│   └── roadmap.md        # Four-phase development plan
 ├── .github/
 │   ├── agents/           # Custom agent definitions
 │   ├── prompts/          # Onboarding workflows
