@@ -3,6 +3,7 @@ import { Paddle } from '../objects/Paddle.ts';
 import { Ball } from '../objects/Ball.ts';
 import { TouchInputManager } from '../input/TouchInputManager.ts';
 import { NetworkManager, GameStateSnapshot } from '../network/NetworkManager.ts';
+import { PADDLE_SPEED, BALL_SPEED, WINNING_SCORE } from '@pong9/shared/constants';
 
 // Palette Constants (match values in domain_ui.md)
 export const COLORS = {
@@ -13,10 +14,9 @@ export const COLORS = {
   BALL: 0xffffff,   // White
 };
 
-// Game Constants
-const PADDLE_SPEED = 500;
-const BALL_SPEED = 400;
-const WINNING_SCORE = 5;
+// Reconciliation threshold per domain_net.md
+// "Reconcile with server state only if deviation > 5px"
+const RECONCILIATION_THRESHOLD = 5;
 
 // Scene data interface for type safety
 interface GameSceneData {
@@ -529,6 +529,13 @@ export class GameScene extends Phaser.Scene {
       }
       this.paddle1.clampPosition(height);
       
+      // Per domain_net.md: "Reconcile with server state only if deviation > 5px"
+      // Snap to server position if local prediction drifted too far
+      const paddle1Y = this.paddle1.getSprite().y;
+      if (Math.abs(paddle1Y - this.targetPaddle1Y) > RECONCILIATION_THRESHOLD) {
+        this.paddle1.getSprite().y = this.targetPaddle1Y;
+      }
+      
       // Interpolate remote paddle (P2) to server position
       const paddle2Sprite = this.paddle2.getSprite();
       paddle2Sprite.y = Phaser.Math.Linear(
@@ -545,6 +552,13 @@ export class GameScene extends Phaser.Scene {
         this.paddle2.moveDown(delta, PADDLE_SPEED, height);
       }
       this.paddle2.clampPosition(height);
+      
+      // Per domain_net.md: "Reconcile with server state only if deviation > 5px"
+      // Snap to server position if local prediction drifted too far
+      const paddle2Y = this.paddle2.getSprite().y;
+      if (Math.abs(paddle2Y - this.targetPaddle2Y) > RECONCILIATION_THRESHOLD) {
+        this.paddle2.getSprite().y = this.targetPaddle2Y;
+      }
       
       // Interpolate remote paddle (P1) to server position
       const paddle1Sprite = this.paddle1.getSprite();

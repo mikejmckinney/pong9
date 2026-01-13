@@ -299,10 +299,14 @@ export class GameRoom extends Room<GameState> {
 
     // Current speed with 5% increase per hit (capped at 2x base speed)
     // Speed increase makes rallies more exciting as they progress
-    const currentSpeed = Math.sqrt(
+    let currentSpeed = Math.sqrt(
       this.state.ballVelX * this.state.ballVelX + 
       this.state.ballVelY * this.state.ballVelY
     );
+    // Guard against zero speed (defensive coding to prevent NaN)
+    if (currentSpeed === 0) {
+      currentSpeed = BALL_SPEED;
+    }
     const newSpeed = Math.min(currentSpeed * 1.05, BALL_SPEED * 2);
 
     // Calculate new velocities
