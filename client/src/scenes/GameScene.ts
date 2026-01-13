@@ -486,7 +486,9 @@ export default class GameScene extends Phaser.Scene {
         });
 
         if (this.useNetworkBall) {
-            this.ball.setPosition(state.ball.x, state.ball.y);
+            if (this.ball.x !== state.ball.x || this.ball.y !== state.ball.y) {
+                this.ball.setPosition(state.ball.x, state.ball.y);
+            }
             const body = this.ball.body as Phaser.Physics.Arcade.Body | null;
             if (body) {
                 body.setVelocity(0, 0);
@@ -539,10 +541,19 @@ export default class GameScene extends Phaser.Scene {
         const leftPlayer = this.findPlayerBySide(state, 'left');
         const rightPlayer = this.findPlayerBySide(state, 'right');
 
-        this.score1 = leftPlayer?.score ?? 0;
-        this.score2 = rightPlayer?.score ?? 0;
-        this.score1Text.setText(this.score1.toString());
-        this.score2Text.setText(this.score2.toString());
+        // Left player maps to P1 (cyan) score1; right player maps to P2 (pink) score2
+        const nextScore1 = leftPlayer?.score ?? 0;
+        const nextScore2 = rightPlayer?.score ?? 0;
+
+        if (nextScore1 !== this.score1) {
+            this.score1 = nextScore1;
+            this.score1Text.setText(this.score1.toString());
+        }
+
+        if (nextScore2 !== this.score2) {
+            this.score2 = nextScore2;
+            this.score2Text.setText(this.score2.toString());
+        }
     }
 
     private findPlayerBySide(state: GameState, side: PlayerSide): PlayerState | undefined {

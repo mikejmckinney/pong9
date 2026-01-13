@@ -1,14 +1,20 @@
 import { Client, Room } from 'colyseus';
 import { GameState, PlayerState } from '../../../shared/GameState';
-import { GAME_HEIGHT, GAME_WIDTH, PADDLE_HEIGHT, PADDLE_SPEED, MAX_PLAYERS } from '../../../shared/constants';
+import {
+    BALL_RESPAWN_DELAY_MS,
+    BALL_SPEED,
+    GAME_HEIGHT,
+    GAME_WIDTH,
+    MAX_BOUNCE_ANGLE_SPEED,
+    MAX_PLAYERS,
+    PADDLE_HEIGHT,
+    PADDLE_MARGIN,
+    PADDLE_SPEED,
+    PADDLE_WIDTH
+} from '../../../shared/constants';
 import { InputDirection, InputMessage, MESSAGE_TYPES, PlayerSide } from '../../../shared/messages';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-const BALL_SPEED = 500;
-const MAX_BOUNCE_ANGLE_SPEED = 450;
-const BALL_RESPAWN_DELAY_MS = 1000;
-const PADDLE_WIDTH = 20;
-const PADDLE_MARGIN = 50;
 
 export class PongRoom extends Room<GameState> {
     maxClients = MAX_PLAYERS;
