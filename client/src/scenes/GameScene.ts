@@ -30,6 +30,7 @@ export class GameScene extends Phaser.Scene {
   private gameOver = false;
   private winnerText?: Phaser.GameObjects.Text;
   private restartText?: Phaser.GameObjects.Text;
+  private restartHandler?: () => void;
   private keyboardKeys?: {
     p1Up: Phaser.Input.Keyboard.Key;
     p1Down: Phaser.Input.Keyboard.Key;
@@ -184,8 +185,8 @@ export class GameScene extends Phaser.Scene {
     };
 
     if (this.keyboardKeys) {
-      this.input.keyboard?.on('keydown', () => {
-        if (this.gameOver && this.keyboardKeys?.restart.isDown) {
+      this.keyboardKeys.restart.on('down', () => {
+        if (this.gameOver) {
           this.restartGame();
         }
       });
@@ -218,7 +219,7 @@ export class GameScene extends Phaser.Scene {
     const direction = paddle === this.paddle1 ? 1 : -1;
     
     // Apply new velocity
-    const speed = Math.max(Math.abs(ballBody.velocity.x), Math.abs(ballBody.velocity.y)) * 1.05; // Slight speed increase
+    const speed = ballBody.velocity.length() * 1.05; // Slight speed increase using proper velocity magnitude
     const clampedSpeed = Math.min(speed, BALL_SPEED * 2); // Cap max speed
     
     const velocity = new Phaser.Math.Vector2(direction * clampedSpeed, 0);
@@ -286,8 +287,9 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
     }).setOrigin(0.5);
 
-    // Enable tap to restart
-    this.input.once('pointerdown', () => this.restartGame());
+    // Enable tap to restart - store handler so it can be removed if keyboard restart is used
+    this.restartHandler = () => this.restartGame();
+    this.input.once('pointerdown', this.restartHandler);
   }
 
   private restartGame(): void {
@@ -296,6 +298,12 @@ export class GameScene extends Phaser.Scene {
     this.scoreText1.setText('0');
     this.scoreText2.setText('0');
     this.gameOver = false;
+
+    // Remove any pending restart listener to prevent stale handler from triggering mid-game
+    if (this.restartHandler) {
+      this.input.off('pointerdown', this.restartHandler);
+      this.restartHandler = undefined;
+    }
 
     if (this.winnerText) {
       this.winnerText.destroy();

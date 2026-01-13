@@ -44,8 +44,6 @@ const unlockAudio = () => {
   if (soundManager.context && soundManager.context.state === 'suspended') {
     soundManager.context.resume();
   }
-  document.removeEventListener('touchstart', unlockAudio);
-  document.removeEventListener('click', unlockAudio);
 };
 
 document.addEventListener('touchstart', unlockAudio, { once: true });

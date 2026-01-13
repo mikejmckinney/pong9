@@ -13,7 +13,7 @@ export class TouchInputManager {
   private paddle1: Paddle;
   private paddle2: Paddle;
   private paddleSpeed: number;
-  private activePointers: Map<number, { side: 'left' | 'right'; startY: number }> = new Map();
+  private activePointers: Map<number, { side: 'left' | 'right' }> = new Map();
 
   constructor(scene: Phaser.Scene, paddle1: Paddle, paddle2: Paddle, paddleSpeed: number) {
     this.scene = scene;
@@ -33,10 +33,7 @@ export class TouchInputManager {
       const { width } = this.scene.scale;
       const side: 'left' | 'right' = pointer.x < width / 2 ? 'left' : 'right';
       
-      this.activePointers.set(pointer.id, {
-        side,
-        startY: pointer.y,
-      });
+      this.activePointers.set(pointer.id, { side });
     });
 
     // Handle pointer up
@@ -83,32 +80,4 @@ export class TouchInputManager {
     }
   }
 
-  /**
-   * Alternative control method: Direct paddle positioning
-   * Move paddle directly to touch Y position (more responsive feel)
-   */
-  updateDirectControl(): void {
-    const { height } = this.scene.scale;
-
-    for (const [pointerId, pointerData] of this.activePointers) {
-      const pointer = this.scene.input.manager.pointers.find(p => p.id === pointerId);
-      if (!pointer || !pointer.isDown) {
-        this.activePointers.delete(pointerId);
-        continue;
-      }
-
-      const paddle = pointerData.side === 'left' ? this.paddle1 : this.paddle2;
-      
-      // Lerp paddle Y position towards touch Y position
-      const targetY = Phaser.Math.Clamp(
-        pointer.y,
-        paddle.getSprite().displayHeight / 2,
-        height - paddle.getSprite().displayHeight / 2
-      );
-      
-      const currentY = paddle.getSprite().y;
-      const newY = Phaser.Math.Linear(currentY, targetY, 0.2);
-      paddle.setY(newY);
-    }
-  }
 }
