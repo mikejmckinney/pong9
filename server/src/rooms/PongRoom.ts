@@ -7,7 +7,7 @@ import {
     GAME_WIDTH,
     MAX_BOUNCE_ANGLE_SPEED,
     MAX_PLAYERS,
-    SERVE_ANGLE_OFFSET_DEG,
+    SERVE_ANGLE_HALF_RANGE_DEG,
     SERVE_ANGLE_RANGE_DEG,
     SERVE_DIRECTION_THRESHOLD,
     PADDLE_HEIGHT,
@@ -16,6 +16,7 @@ import {
     PADDLE_WIDTH
 } from '../../../shared/constants';
 import { InputDirection, InputMessage, MESSAGE_TYPES, PlayerSide } from '../../../shared/messages';
+import { getPlayerBySide } from '../../../shared/playerUtils';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
@@ -176,7 +177,7 @@ export class PongRoom extends Room<GameState> {
     private launchBall() {
         this.resetBallToCenter();
         const direction = Math.random() < SERVE_DIRECTION_THRESHOLD ? -1 : 1;
-        const angleDeg = Math.random() * SERVE_ANGLE_RANGE_DEG - SERVE_ANGLE_OFFSET_DEG;
+        const angleDeg = Math.random() * SERVE_ANGLE_RANGE_DEG - SERVE_ANGLE_HALF_RANGE_DEG;
         const angleRad = (angleDeg * Math.PI) / 180;
 
         this.ballVelocity.x = Math.cos(angleRad) * BALL_SPEED * direction;
@@ -204,8 +205,8 @@ export class PongRoom extends Room<GameState> {
     }
 
     private handlePaddleCollision() {
-        const leftPlayer = this.getPlayerBySide('left');
-        const rightPlayer = this.getPlayerBySide('right');
+        const leftPlayer = getPlayerBySide(this.state.players, 'left');
+        const rightPlayer = getPlayerBySide(this.state.players, 'right');
 
         if (leftPlayer) {
             this.checkPaddleCollision(leftPlayer, 'left');
@@ -267,19 +268,10 @@ export class PongRoom extends Room<GameState> {
     }
 
     private awardPoint(side: PlayerSide) {
-        const scorer = this.getPlayerBySide(side);
+        const scorer = getPlayerBySide(this.state.players, side);
         if (scorer) {
             scorer.score += 1;
         }
         this.prepareNextServe();
-    }
-
-    private getPlayerBySide(side: PlayerSide): PlayerState | undefined {
-        for (const player of this.state.players.values()) {
-            if (player.side === side) {
-                return player;
-            }
-        }
-        return undefined;
     }
 }

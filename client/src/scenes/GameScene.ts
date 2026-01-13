@@ -16,7 +16,8 @@ import Paddle from '../objects/Paddle';
 import Ball from '../objects/Ball';
 import { Client, Room } from 'colyseus.js';
 import { MESSAGE_TYPES, ROOM_NAME, type GamePhase, type InputDirection, type PlayerSide } from '@shared/messages';
-import type { GameState, PlayerState } from '@shared/GameState';
+import type { GameState } from '@shared/GameState';
+import { getPlayerBySide } from '@shared/playerUtils';
 
 const NETWORK_POSITION_EPSILON = 0.5;
 
@@ -490,11 +491,12 @@ export default class GameScene extends Phaser.Scene {
         if (this.useNetworkBall) {
             const deltaX = Math.abs(this.ball.x - state.ball.x);
             const deltaY = Math.abs(this.ball.y - state.ball.y);
-            if (deltaX > NETWORK_POSITION_EPSILON || deltaY > NETWORK_POSITION_EPSILON) {
+            const positionChanged = deltaX > NETWORK_POSITION_EPSILON || deltaY > NETWORK_POSITION_EPSILON;
+            if (positionChanged) {
                 this.ball.setPosition(state.ball.x, state.ball.y);
             }
             const body = this.ball.body as Phaser.Physics.Arcade.Body | null;
-            if (body) {
+            if (positionChanged && body) {
                 body.setVelocity(0, 0);
             }
             this.updateScoresFromState(state);
@@ -544,8 +546,8 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private updateScoresFromState(state: GameState) {
-        const leftPlayer = this.findPlayerBySide(state, 'left');
-        const rightPlayer = this.findPlayerBySide(state, 'right');
+        const leftPlayer = getPlayerBySide(state.players, 'left');
+        const rightPlayer = getPlayerBySide(state.players, 'right');
 
         // Left player maps to P1 (cyan) score1; right player maps to P2 (pink) score2
         const nextScore1 = leftPlayer?.score ?? 0;
@@ -560,15 +562,6 @@ export default class GameScene extends Phaser.Scene {
             this.score2 = nextScore2;
             this.score2Text.setText(this.score2.toString());
         }
-    }
-
-    private findPlayerBySide(state: GameState, side: PlayerSide): PlayerState | undefined {
-        for (const player of state.players.values()) {
-            if (player.side === side) {
-                return player;
-            }
-        }
-        return undefined;
     }
 
     private sendPing() {
