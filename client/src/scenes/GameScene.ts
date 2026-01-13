@@ -216,17 +216,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handleDirectionalInput(paddle: Paddle, direction: InputDirection) {
-        if (this.networkRoom) {
-            if (!this.localSide) {
-                return;
-            }
-            if (!this.isLocalPaddle(paddle)) {
-                return;
-            }
+        if (!this.canHandleInput(paddle)) {
+            return;
         }
 
-        const useNetwork = Boolean(this.networkRoom && this.localSide && this.isLocalPaddle(paddle));
-        if (useNetwork) {
+        if (this.isNetworkControlledPaddle(paddle)) {
             this.sendNetworkInput(direction);
             this.applyLocalMovement(paddle, direction);
             return;
@@ -236,17 +230,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handleStopInput(paddle: Paddle) {
-        if (this.networkRoom) {
-            if (!this.localSide) {
-                return;
-            }
-            if (!this.isLocalPaddle(paddle)) {
-                return;
-            }
+        if (!this.canHandleInput(paddle)) {
+            return;
         }
 
-        const useNetwork = Boolean(this.networkRoom && this.localSide && this.isLocalPaddle(paddle));
-        if (useNetwork) {
+        if (this.isNetworkControlledPaddle(paddle)) {
             this.sendNetworkInput('stop');
         }
 
@@ -269,6 +257,22 @@ export default class GameScene extends Phaser.Scene {
         }
 
         return (this.localSide === 'left' && paddle === this.paddle1) || (this.localSide === 'right' && paddle === this.paddle2);
+    }
+
+    private canHandleInput(paddle: Paddle): boolean {
+        if (!this.networkRoom) {
+            return true;
+        }
+
+        if (!this.localSide) {
+            return false;
+        }
+
+        return this.isLocalPaddle(paddle);
+    }
+
+    private isNetworkControlledPaddle(paddle: Paddle): boolean {
+        return Boolean(this.networkRoom && this.localSide && this.isLocalPaddle(paddle));
     }
 
     private setupCollisions() {
