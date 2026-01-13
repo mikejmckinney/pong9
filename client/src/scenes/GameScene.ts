@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { Paddle } from '../objects/Paddle.ts';
 import { Ball } from '../objects/Ball.ts';
 import { TouchInputManager } from '../input/TouchInputManager.ts';
+import { NetworkManager, GameStateSnapshot } from '../network/NetworkManager.ts';
 
 // Palette Constants (match values in domain_ui.md)
 export const COLORS = {
@@ -16,6 +17,11 @@ export const COLORS = {
 const PADDLE_SPEED = 500;
 const BALL_SPEED = 400;
 const WINNING_SCORE = 5;
+
+// Scene data interface for type safety
+interface GameSceneData {
+  networkManager?: NetworkManager;
+}
 
 export class GameScene extends Phaser.Scene {
   private gridGraphics!: Phaser.GameObjects.Graphics;
@@ -38,9 +44,19 @@ export class GameScene extends Phaser.Scene {
     p2Down: Phaser.Input.Keyboard.Key;
     restart: Phaser.Input.Keyboard.Key;
   };
+  // Network support (Phase 2)
+  private networkManager?: NetworkManager;
+  private isNetworked = false;
+  private latencyText?: Phaser.GameObjects.Text;
 
   constructor() {
     super('GameScene');
+  }
+
+  init(data: GameSceneData): void {
+    // Receive network manager from LobbyScene if in multiplayer mode
+    this.networkManager = data.networkManager;
+    this.isNetworked = !!this.networkManager;
   }
 
   create(): void {
@@ -79,8 +95,73 @@ export class GameScene extends Phaser.Scene {
     // Setup keyboard controls for testing on desktop
     this.setupKeyboardControls();
 
+    // Setup network mode if available
+    if (this.isNetworked) {
+      this.setupNetworkMode(width);
+    }
+
     // Start the ball moving after a short delay
     this.time.delayedCall(1000, () => this.launchBall());
+  }
+
+  /**
+   * Setup network mode UI and callbacks (Phase 2)
+   * Full physics sync will be implemented in Phase 3
+   */
+  private setupNetworkMode(width: number): void {
+    if (!this.networkManager) return;
+
+    // Show connection status
+    const playerNumber = this.networkManager.getPlayerNumber();
+    const playerColor = playerNumber === 1 ? '#04c4ca' : '#ff2975';
+    
+    this.add.text(width / 2, 90, `PLAYER ${playerNumber}`, {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '14px',
+      color: playerColor,
+    }).setOrigin(0.5);
+
+    // Latency display
+    this.latencyText = this.add.text(width - 10, 10, 'PING: --ms', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '10px',
+      color: '#04c4ca',
+    }).setOrigin(1, 0);
+
+    // Setup network callbacks
+    this.networkManager.setCallbacks({
+      onStateChange: (state) => this.onNetworkStateChange(state),
+      onPong: (latency) => {
+        if (this.latencyText) {
+          this.latencyText.setText(`PING: ${Math.round(latency)}ms`);
+        }
+      },
+      onGameEnd: (reason) => {
+        this.showGameOver(0); // 0 indicates disconnection
+        if (this.winnerText) {
+          this.winnerText.setText(`DISCONNECTED: ${reason}`);
+        }
+      },
+    });
+  }
+
+  /**
+   * Handle state changes from server (Phase 2 - basic sync)
+   * Full authoritative physics in Phase 3
+   */
+  private onNetworkStateChange(state: GameStateSnapshot): void {
+    // Update scores from server
+    if (state.score1 !== this.score1) {
+      this.score1 = state.score1;
+      this.scoreText1.setText(this.score1.toString());
+    }
+    if (state.score2 !== this.score2) {
+      this.score2 = state.score2;
+      this.scoreText2.setText(this.score2.toString());
+    }
+
+    // In Phase 3, we'll also sync paddle positions and ball state
+    // For Phase 2, local physics still controls the game
   }
 
   private createProceduralGrid(width: number, height: number): void {
@@ -379,5 +460,39 @@ export class GameScene extends Phaser.Scene {
     // Keep paddles in bounds
     this.paddle1.clampPosition(height);
     this.paddle2.clampPosition(height);
+
+    // Send input to server if in networked mode
+    if (this.isNetworked && this.networkManager) {
+      this.sendNetworkInput();
+    }
+  }
+
+  /**
+   * Send player input to server (Phase 2)
+   * Per domain_net.md: Client sends intent (UP/DOWN), NOT position
+   */
+  private sendNetworkInput(): void {
+    if (!this.networkManager) return;
+
+    const playerNumber = this.networkManager.getPlayerNumber();
+    
+    // Determine input based on touch or keyboard
+    let input: 'UP' | 'DOWN' | 'NONE' = 'NONE';
+    
+    // Check keyboard input for the appropriate player
+    if (this.keyboardKeys) {
+      if (playerNumber === 1) {
+        if (this.keyboardKeys.p1Up.isDown) input = 'UP';
+        else if (this.keyboardKeys.p1Down.isDown) input = 'DOWN';
+      } else {
+        if (this.keyboardKeys.p2Up.isDown) input = 'UP';
+        else if (this.keyboardKeys.p2Down.isDown) input = 'DOWN';
+      }
+    }
+
+    // Touch input handled by TouchInputManager, we just need to send the intent
+    // In Phase 3, we'll refactor to separate touch intent capture
+    
+    this.networkManager.sendInput(input);
   }
 }

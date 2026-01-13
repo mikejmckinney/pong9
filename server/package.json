@@ -1,0 +1,22 @@
+{
+  "name": "@pong9/server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Colyseus multiplayer server for Pong9 game",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node --enable-source-maps dist/main.js",
+    "dev": "npx tsx watch src/main.ts"
+  },
+  "dependencies": {
+    "colyseus": "^0.16.5",
+    "@colyseus/schema": "^3.0.76",
+    "@pong9/shared": "1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3",
+    "tsx": "^4.7.0",
+    "@types/node": "^20.10.6"
+  }
+}

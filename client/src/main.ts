@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { GameScene } from './scenes/GameScene.ts';
+import { LobbyScene } from './scenes/LobbyScene.ts';
 
 // Game configuration following domain_ui.md specifications
 const config: Phaser.Types.Core.GameConfig = {
@@ -18,7 +19,7 @@ const config: Phaser.Types.Core.GameConfig = {
       debug: false,
     },
   },
-  scene: [GameScene],
+  scene: [LobbyScene, GameScene],
   // Enable WebGL for PostFX bloom effects
   render: {
     pixelArt: false,
