@@ -13,6 +13,9 @@ import {
 } from '../config/constants';
 import Paddle from '../objects/Paddle';
 import Ball from '../objects/Ball';
+import { Client, Room } from 'colyseus.js';
+import { MESSAGE_TYPES, ROOM_NAME, type GamePhase } from '@shared/messages';
+import type { GameState } from '@shared/GameState';
 
 export default class GameScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
@@ -30,6 +33,10 @@ export default class GameScene extends Phaser.Scene {
     // Touch zones for mobile controls
     private leftZone!: Phaser.GameObjects.Zone;
     private rightZone!: Phaser.GameObjects.Zone;
+    private networkStatusText?: Phaser.GameObjects.Text;
+    private networkClient?: Client;
+    private networkRoom?: Room<GameState>;
+    private pingTimer?: Phaser.Time.TimerEvent;
 
     constructor() {
         super('GameScene');
@@ -84,6 +91,9 @@ export default class GameScene extends Phaser.Scene {
             this.ball.launch();
             this.isResettingBall = false;
         });
+
+        // Attempt to connect to the Colyseus server without blocking gameplay
+        void this.connectToServer();
     }
 
     update() {
@@ -243,5 +253,109 @@ export default class GameScene extends Phaser.Scene {
             this.ball.launch();
             this.isResettingBall = false;
         });
+    }
+
+    /**
+     * Establish a Colyseus connection and surface connection / waiting status in-game.
+     * Gameplay continues locally even if the connection fails.
+     */
+    private async connectToServer() {
+        const { width, height } = this.scale;
+        this.networkStatusText = this.add.text(width / 2, height - 40, 'Connecting…', {
+            fontFamily: 'Press Start 2P',
+            fontSize: '16px',
+            color: '#04c4ca'
+        }).setOrigin(0.5);
+
+        // Track pending connection to handle cleanup if scene is destroyed during connect
+        let pendingConnection = true;
+
+        // Register cleanup handler BEFORE the await to prevent resource leak
+        // if scene is destroyed while connection is pending
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            pendingConnection = false;
+            this.pingTimer?.remove();
+            void this.networkRoom?.leave();
+        });
+
+        try {
+            const endpoint = this.getServerEndpoint();
+            this.networkClient = new Client(endpoint);
+            this.networkRoom = await this.networkClient.joinOrCreate<GameState>(ROOM_NAME);
+
+            // If scene was destroyed during await, clean up and exit
+            if (!pendingConnection) {
+                void this.networkRoom.leave();
+                return;
+            }
+
+            // Simplified state change handler - state is guaranteed by Colyseus
+            this.networkRoom.onStateChange((state) => {
+                this.updateNetworkStatus(state.phase);
+            });
+
+            this.networkRoom.onMessage(MESSAGE_TYPES.PONG, () => {
+                const phase = this.networkRoom?.state.phase ?? 'waiting';
+                this.updateNetworkStatus(phase);
+            });
+
+            // Handle disconnection to prevent stale status display
+            this.networkRoom.onLeave(() => {
+                this.networkRoom = undefined;
+                this.pingTimer?.remove();
+                this.pingTimer = undefined;
+                if (this.networkStatusText) {
+                    this.networkStatusText.setText('Disconnected: local play');
+                }
+            });
+
+            this.updateNetworkStatus(this.networkRoom.state.phase);
+            this.sendPing();
+            this.pingTimer = this.time.addEvent({
+                delay: 10000,
+                loop: true,
+                callback: () => this.sendPing()
+            });
+        } catch (error) {
+            console.warn('Colyseus connection failed; continuing with local play only.', error);
+            if (this.networkStatusText) {
+                this.networkStatusText.setText('Offline: local play');
+            }
+        }
+    }
+
+    private getServerEndpoint(): string {
+        const configured = import.meta.env.VITE_COLYSEUS_ENDPOINT;
+        if (configured) {
+            return configured;
+        }
+
+        const isSecure = window.location.protocol === 'https:';
+        const host = window.location.hostname || 'localhost';
+        const port = isSecure ? 443 : 2567;
+        return `${isSecure ? 'wss' : 'ws'}://${host}:${port}`;
+    }
+
+    private updateNetworkStatus(phase: GamePhase = 'waiting') {
+        if (!this.networkStatusText) {
+            return;
+        }
+
+        if (!this.networkRoom) {
+            this.networkStatusText.setText('Offline: local play');
+            return;
+        }
+
+        if (phase === 'playing') {
+            this.networkStatusText.setText('Online: match ready');
+        } else {
+            this.networkStatusText.setText('Connected: waiting for player');
+        }
+    }
+
+    private sendPing() {
+        if (this.networkRoom) {
+            this.networkRoom.send(MESSAGE_TYPES.PING, { timestamp: Date.now() });
+        }
     }
 }
