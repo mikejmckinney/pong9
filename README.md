@@ -69,7 +69,7 @@ See [`.context/roadmap.md`](.context/roadmap.md) for the complete four-phase pla
 
 - **[AI_REPO_GUIDE.md](./AI_REPO_GUIDE.md)** - Comprehensive repository guide (start here!)
 - **[AGENTS.md](./AGENTS.md)** - Agent interaction guidelines
-- **[.context/rules/](./context/rules/)** - Domain-specific architectural rules
+- **[.context/rules/](./.context/rules/)** - Domain-specific architectural rules
   - `_master.md` - Core agent protocol
   - `tech_stack.md` - Technical specifications
   - `domain_ui.md` - UI/graphics requirements
