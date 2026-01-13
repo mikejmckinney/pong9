@@ -1,7 +1,7 @@
 import { Room, Client } from 'colyseus';
 import { GameState, Player } from '../schemas/index.js';
 import { PlayerInput, GamePhase, PingMessage, PongMessage } from '@pong9/shared/interfaces';
-import { PADDLE_SPEED, SERVER_TICK_RATE } from '@pong9/shared/constants';
+import { PADDLE_SPEED, SERVER_TICK_RATE, BALL_SPEED } from '@pong9/shared/constants';
 
 /**
  * GameRoom handles multiplayer Pong game sessions
@@ -163,10 +163,9 @@ export class GameRoom extends Room<GameState> {
     // Full physics implementation in Phase 3
     const direction = Math.random() > 0.5 ? 1 : -1;
     const angle = (Math.random() - 0.5) * Math.PI / 3; // -30 to +30 degrees
-    const speed = 400;
     
-    this.state.ballVelX = direction * speed * Math.cos(angle);
-    this.state.ballVelY = speed * Math.sin(angle);
+    this.state.ballVelX = direction * BALL_SPEED * Math.cos(angle);
+    this.state.ballVelY = BALL_SPEED * Math.sin(angle);
 
     console.log(`[GameRoom] Ball launched with velocity (${this.state.ballVelX.toFixed(2)}, ${this.state.ballVelY.toFixed(2)})`);
   }

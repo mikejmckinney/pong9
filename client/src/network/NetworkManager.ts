@@ -48,6 +48,7 @@ export class NetworkManager {
   private playerNumber: 1 | 2 = 1;
   private lastPingTime: number = 0;
   private latency: number = 0;
+  private pingIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor(serverUrl: string = 'ws://localhost:2567') {
     this.client = new Client(serverUrl);
@@ -91,6 +92,12 @@ export class NetworkManager {
    * Disconnect from the room
    */
   disconnect(): void {
+    // Clear ping interval to prevent memory leak
+    if (this.pingIntervalId) {
+      clearInterval(this.pingIntervalId);
+      this.pingIntervalId = null;
+    }
+    
     if (this.room) {
       this.room.leave();
       this.room = null;
@@ -236,7 +243,7 @@ export class NetworkManager {
 
   private startPingLoop(): void {
     // Send ping every 2 seconds for latency measurement
-    setInterval(() => {
+    this.pingIntervalId = setInterval(() => {
       if (this.room) {
         this.lastPingTime = Date.now();
         this.room.send('ping', { clientTime: this.lastPingTime });
