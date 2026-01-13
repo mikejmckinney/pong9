@@ -18,14 +18,14 @@ This directory contains the immutable laws of the project. You must obey these c
 
 Before writing code for a specific domain, you must read the corresponding rule file:
 
-* **If working on Frontend/Graphics:** Read `.context/rules/domain_ui.md` and `.context/design/visual_blueprint.md`.
+* **If working on frontend/graphics:** Read `.context/rules/domain_ui.md` and `.context/design/visual_blueprint.md`.
 * **If working on backend/networking:** Read `.context/rules/domain_net.md` and `.context/rules/tech_stack.md`.
-* **If writing Tests:** Read `.context/rules/domain_qa.md`.
+* **If writing tests:** Read `.context/rules/domain_qa.md`.
 * **To see the big picture:** Refer to `.context/roadmap.md` and `.context/design/architecture.md`.
 
-### 3. The "Human Archive" (DO NOT READ)
+### 3. The "Human Archive" (Avoid Unless Necessary)
 **Directory: `./docs/archive/`**
-This directory contains outdated or verbose human specifications. **You are forbidden from reading files in this directory.** Rely only on the distilled rules in the `.context/` directory.
+This directory contains outdated or verbose human specifications. **You should generally avoid reading files in this directory.** Prefer the distilled rules in the `.context/` directory and the current guidance in `AI_REPO_GUIDE.md`. Only read from `./docs/archive/` if explicitly instructed or when you need historical context that is not available elsewhere, and never treat it as overriding `.context/` rules.
 
 ## CORE CONSTRAINTS SUMMARY
 (Full details are in `.context/rules/tech_stack.md`)

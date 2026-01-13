@@ -21,7 +21,7 @@ import Phaser from 'phaser';
 // 1. Define Palette Constants (match values in domain_ui.md)
 const COLORS = {
     BG: 0x1b2853,   // Deep Indigo
-    GRID: 0x5e3e74, // Slightly lighter purple for grid lines
+    GRID: 0x2b2b2b, // Dark gray grid lines (matches domain_ui.md)
     P1: 0x04c4ca,   // Neon Cyan
     P2: 0xff2975,   // Hot Pink
     BALL: 0xffffff  // White (bloom will color it based on surroundings eventually)
@@ -44,14 +44,11 @@ export default class GameScene extends Phaser.Scene {
         // 3. Implement the "Synthwave Glow" Pipeline (CRITICAL)
         // We add a Bloom effect to the entire camera view.
         // Ensure your Phaser config enables PostFX support.
-        (this.cameras.main as any).setPostPipeline(Phaser.Renderer.WebGL.Pipelines.BloomFX);
-        const bloom = this.cameras.main.getPostPipeline(Phaser.Renderer.WebGL.Pipelines.BloomFX);
-        
+        const bloom = this.cameras.main.postFX.addBloom();
+
         // Tweak these values during development to match the visual target concept.
-        if (bloom instanceof Phaser.Renderer.WebGL.Pipelines.BloomFX) {
-             bloom.setStrength(1.5); // Intensity of the glow
-             bloom.setBlur(2);       // Spread of the glow
-        }
+        bloom.setStrength(1.5); // Intensity of the glow
+        bloom.setBlur(2);       // Spread of the glow
 
         // 4. Generate the Procedural Grid underneath everything
         this.createProceduralGrid(width, height);
@@ -86,8 +83,8 @@ export default class GameScene extends Phaser.Scene {
         this.gridGraphics.strokePath();
 
         // B. Draw Horizontal Lines (Floor markers)
-        // TODO FOR AGENT: Upgrade this to logarithmic spacing for better perspective illusion.
-        // Current implementation is simple fixed spacing.
+        // Reference implementation uses simple fixed spacing for clarity and ease of replication.
+        // More advanced perspective illusions (e.g., non-linear spacing) can be added as a future enhancement.
         for (let y = horizonY; y < height; y += 40) {
             this.gridGraphics.moveTo(0, y);
             this.gridGraphics.lineTo(width, y);
