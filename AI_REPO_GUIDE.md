@@ -2,18 +2,19 @@
 
 ## What This Repo Does
 
-This is a **mobile-first multiplayer Pong game** with a Retro Synthwave aesthetic. The repository contains AI agent configurations, onboarding prompts, structural conventions, and a working Phaser 3 game client.
+This is a **mobile-first multiplayer Pong game** with a Retro Synthwave aesthetic. The repository contains a complete monorepo with a Phaser 3 game client, Colyseus multiplayer server, and shared TypeScript types.
 
-**Current Status:** Phase 1 (The Core Loop) - Local prototype implemented. The game client is functional with paddles, ball physics, scoring, touch controls, and Synthwave visuals.
+**Current Status:** Phase 2 (The Network Plumbing) - In progress. The game client is functional with local play. Multiplayer infrastructure (Colyseus server, GameRoom, schemas) has been implemented and is ready for testing.
 
 ## Tech Stack
 
 - **Language:** TypeScript (Strict Mode) for both client and server
 - **Frontend Engine:** Phaser 3.70.0
-- **Build Tool:** Vite 7.x
-- **Backend Framework:** Node.js + Colyseus (planned for Phase 2)
+- **Build Tool:** Vite 7.x (client), TSC (server)
+- **Backend Framework:** Node.js + Colyseus 0.16.5
 - **Database:** Firebase v9 Modular SDK (planned for leaderboards)
 - **Test Framework:** Jest (planned)
+- **Monorepo:** npm workspaces
 - **Deployment:** 
   - Client: GitHub Pages or Netlify (static)
   - Server: Docker container (Render/Railway/Fly.io)
@@ -22,20 +23,41 @@ This is a **mobile-first multiplayer Pong game** with a Retro Synthwave aestheti
 
 ```
 /
-├── client/                # Phaser 3 game client (Phase 1 complete)
+├── package.json           # Root workspace configuration
+├── .gitignore            # Global gitignore for monorepo
+├── client/                # Phaser 3 game client (Phase 1 complete, Phase 2 in progress)
 │   ├── src/
 │   │   ├── main.ts       # Phaser game bootstrap and configuration
 │   │   ├── scenes/       # Game scenes
-│   │   │   └── GameScene.ts  # Main gameplay scene with Synthwave aesthetic
+│   │   │   ├── LobbyScene.ts   # Multiplayer connection and waiting state
+│   │   │   └── GameScene.ts    # Main gameplay scene with Synthwave aesthetic
 │   │   ├── objects/      # Game entities
 │   │   │   ├── Paddle.ts # Paddle class with procedural generation
 │   │   │   └── Ball.ts   # Ball class with procedural generation
-│   │   └── input/        # Input handling
-│   │       └── TouchInputManager.ts  # Split-screen touch controls
+│   │   ├── input/        # Input handling
+│   │   │   └── TouchInputManager.ts  # Split-screen touch controls
+│   │   └── network/      # Network layer
+│   │       └── NetworkManager.ts     # Colyseus client wrapper
 │   ├── index.html        # HTML entry with CRT overlays and orientation detection
 │   ├── package.json      # NPM dependencies and scripts
 │   ├── tsconfig.json     # TypeScript configuration (strict mode)
 │   └── vite.config.ts    # Vite build configuration
+├── server/                # Colyseus multiplayer server (Phase 2)
+│   ├── src/
+│   │   ├── main.ts       # Server entry point
+│   │   ├── rooms/        # Game room implementations
+│   │   │   └── GameRoom.ts   # Main game room with player matching
+│   │   └── schemas/      # Colyseus state schemas
+│   │       ├── GameState.ts  # Game state with ball, scores, phase
+│   │       └── Player.ts     # Player state with position
+│   ├── package.json      # Server dependencies
+│   └── tsconfig.json     # Server TypeScript configuration
+├── shared/                # Shared TypeScript types and constants
+│   ├── constants.ts      # Game constants (dimensions, speeds, etc.)
+│   ├── interfaces.ts     # Message types and interfaces
+│   ├── index.ts          # Module exports
+│   ├── package.json      # Shared package configuration
+│   └── tsconfig.json     # Shared TypeScript configuration
 ├── .context/              # Agent memory and state tracking
 │   ├── rules/            # Domain-specific architectural rules
 │   │   ├── _master.md   # Core agent protocol and repository map
@@ -66,24 +88,39 @@ This is a **mobile-first multiplayer Pong game** with a Retro Synthwave aestheti
 └── test.sh               # Template verification script
 ```
 
-**Note:** `/server` and `/shared` directories are planned for Phase 2 (Network Plumbing).
-
 ## Key Entry Points
 
 **Client Application:**
 - `client/src/main.ts` - Phaser game bootstrap and configuration
+- `client/src/scenes/LobbyScene.ts` - Multiplayer connection UI
 - `client/src/scenes/GameScene.ts` - Main gameplay scene
 
-**Planned Entry Points (Phase 2+):**
-- **Server:** Will be in `/server` directory (Colyseus server initialization)
-- **Shared:** Will be in `/shared` directory (TypeScript interfaces)
+**Server Application:**
+- `server/src/main.ts` - Colyseus server initialization
+- `server/src/rooms/GameRoom.ts` - Game room with player matching and game loop
+
+**Shared Types:**
+- `shared/constants.ts` - Game constants (dimensions, speeds)
+- `shared/interfaces.ts` - Message types for client-server communication
 
 ## Configuration Files
+
+- **Root Configuration:**
+  - `package.json` - npm workspaces configuration
+  - `.gitignore` - Global gitignore for monorepo
 
 - **Client Configuration:**
   - `client/package.json` - NPM dependencies and scripts
   - `client/tsconfig.json` - TypeScript strict mode configuration
   - `client/vite.config.ts` - Vite build configuration
+
+- **Server Configuration:**
+  - `server/package.json` - Server dependencies (Colyseus)
+  - `server/tsconfig.json` - Server TypeScript configuration
+
+- **Shared Configuration:**
+  - `shared/package.json` - Shared package for npm workspaces
+  - `shared/tsconfig.json` - Shared TypeScript configuration
 
 - **Agent Configuration:**
   - `.github/copilot-instructions.md` - GitHub Copilot agent instructions
@@ -101,34 +138,62 @@ This is a **mobile-first multiplayer Pong game** with a Retro Synthwave aestheti
 ### Setup Development Environment
 
 ```bash
-# Run the installation script (for Codespaces/VS Code)
+# Install all workspace dependencies from root
+npm install
+
+# Or run the installation script (for Codespaces/VS Code)
 bash install.sh
 ```
 
-This script:
-- Installs VS Code extensions (Cline, Live Server, Prettier, Live Share)
-- Copies AI prompts to `.github/prompts/`
-- Sets up the development workspace
-
-### Run the Game Client
+### Run the Game Client (Local Play)
 
 ```bash
-# Install dependencies
-cd client && npm install
-
-# Start development server (hot reload)
-npm run dev
+# Start client development server (hot reload)
+cd client && npm run dev
 ```
 
 The game will be available at `http://localhost:3000` (or next available port).
 
+### Run the Multiplayer Server
+
+```bash
+# Build shared types first
+npm run build:shared
+
+# Build and start the server
+cd server && npm run build && npm start
+```
+
+The server will be available at `ws://localhost:2567`.
+
+### Run Both for Multiplayer Testing
+
+In two terminals:
+
+```bash
+# Terminal 1: Start server
+cd server && npm run dev
+
+# Terminal 2: Start client
+cd client && npm run dev
+```
+
+Open two browser windows at `http://localhost:3000` to test multiplayer.
+
 ### Build for Production
 
 ```bash
-cd client && npm run build
+# Build all packages
+npm run build
+
+# Or build individually:
+npm run build:shared   # Build shared types
+npm run build:server   # Build server
+npm run build:client   # Build client
 ```
 
-Output will be in `client/dist/`.
+Client output will be in `client/dist/`.
+Server output will be in `server/dist/`.
 
 ### Verify Template Structure
 
@@ -236,11 +301,15 @@ From `.context/roadmap.md`:
 - ✅ Implement Synthwave Graphics (PostFX Bloom, procedural grid)
 - ✅ Implement Mobile Scale Manager (FIT mode) and Touch Inputs
 
-**Phase 2:** The Network Plumbing
-- Setup Node.js + Colyseus Server
-- Define GameState and Player Schemas
-- Implement Room connection
-- Verify message passing
+**Phase 2:** The Network Plumbing 🔄 **IN PROGRESS**
+- ✅ Setup npm workspaces monorepo structure
+- ✅ Create shared package with TypeScript interfaces and constants
+- ✅ Setup Node.js + Colyseus Server
+- ✅ Define GameState and Player Schemas with @type() decorators
+- ✅ Implement GameRoom with "Waiting for Player" state
+- ✅ Create NetworkManager for client-side Colyseus connection
+- ✅ Add LobbyScene for multiplayer connection flow
+- ⏳ Verify message passing (Ping/Pong) - needs testing
 
 **Phase 3:** Authoritative Physics
 - Port Physics to Server
@@ -259,10 +328,12 @@ From `.context/roadmap.md`:
 - **New Phaser Scenes** → `/client/src/scenes/`
 - **Game Objects (Paddle, Ball, etc.)** → `/client/src/objects/`
 - **Input Handlers** → `/client/src/input/`
-- **Server Game Logic** → `/server/src/rooms/` (Phase 2)
-- **Shared Types** → `/shared/` (Phase 2)
+- **Network Client Code** → `/client/src/network/`
+- **Server Game Logic** → `/server/src/rooms/`
+- **Server Schemas** → `/server/src/schemas/`
+- **Shared Types** → `/shared/`
 - **Tests** → Mirror source structure (`/client/tests/`, `/server/tests/`)
-- **Configuration** → Root-level config files or `client/` for client-specific
+- **Configuration** → Root-level config files or workspace-specific
 - **Agent Instructions** → `.context/rules/` or `.github/agents/`
 
 ## Known Risks/Gotchas

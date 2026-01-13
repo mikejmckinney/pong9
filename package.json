@@ -1,0 +1,28 @@
+{
+  "name": "pong9",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
+  "scripts": {
+    "build:shared": "cd shared && npm run build",
+    "build:server": "cd server && npm run build",
+    "build:client": "cd client && npm run build",
+    "build": "npm run build:shared && npm run build:server && npm run build:client",
+    "dev:server": "cd server && npm run dev",
+    "dev:client": "cd client && npm run dev"
+  },
+  "overrides": {
+    "nanoid": "^3.3.7",
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.49.0"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.16.24",
+    "@colyseus/ws-transport": "^0.16.5",
+    "colyseus": "^0.16.5",
+    "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.49.0"
+  }
+}
