@@ -489,15 +489,11 @@ export default class GameScene extends Phaser.Scene {
         });
 
         if (this.useNetworkBall) {
-            const deltaX = Math.abs(this.ball.x - state.ball.x);
-            const deltaY = Math.abs(this.ball.y - state.ball.y);
-            const positionChanged = deltaX > NETWORK_POSITION_EPSILON || deltaY > NETWORK_POSITION_EPSILON;
+            const dx = this.ball.x - state.ball.x;
+            const dy = this.ball.y - state.ball.y;
+            const positionChanged = dx * dx + dy * dy > NETWORK_POSITION_EPSILON * NETWORK_POSITION_EPSILON;
             if (positionChanged) {
                 this.ball.setPosition(state.ball.x, state.ball.y);
-            }
-            const body = this.ball.body as Phaser.Physics.Arcade.Body | null;
-            if (positionChanged && body) {
-                body.setVelocity(0, 0);
             }
             this.updateScoresFromState(state);
         }

@@ -176,6 +176,7 @@ export class PongRoom extends Room<GameState> {
 
     private launchBall() {
         this.resetBallToCenter();
+        // Values below SERVE_DIRECTION_THRESHOLD serve left; above serve right
         const direction = Math.random() < SERVE_DIRECTION_THRESHOLD ? -1 : 1;
         const angleDeg = Math.random() * SERVE_ANGLE_RANGE_DEG - SERVE_ANGLE_HALF_RANGE_DEG;
         const angleRad = (angleDeg * Math.PI) / 180;
@@ -244,6 +245,7 @@ export class PongRoom extends Room<GameState> {
             const paddleCenterY = paddleTop + PADDLE_HEIGHT / 2;
             const offset = clamp((ball.y - paddleCenterY) / (PADDLE_HEIGHT / 2), -1, 1);
 
+            // Snap just outside the paddle to resolve overlap and avoid tunneling at high speed
             this.state.ball.x = side === 'left' ? paddleRight + radius : paddleLeft - radius;
             this.ballVelocity.y = offset * MAX_BOUNCE_ANGLE_SPEED;
             this.ballVelocity.x = side === 'left' ? Math.abs(this.ballVelocity.x) : -Math.abs(this.ballVelocity.x);
