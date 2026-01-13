@@ -141,7 +141,7 @@ graph TD
 
     style Canvas fill:#000,stroke:#04c4ca,color:#fff
     style CRTOverlay fill:transparent,stroke:#ff2975,stroke-dasharray: 5 5,color:#fff
-    style LeftTap fill:rgba(4, 196, 202, 0.2),stroke:none,color:#fff
-    style RightTap fill:rgba(255, 41, 117, 0.2),stroke:none,color:#fff
+    style LeftTap fill:#04c4ca33,stroke:none,color:#fff
+    style RightTap fill:#ff297533,stroke:none,color:#fff
     style CSSRules fill:#333,stroke:#fff,color:#fff
 ```
