@@ -302,6 +302,6 @@ From `.context/roadmap.md`:
 
 ---
 
-**Last Updated:** 2026-01-13 (Initial creation during onboarding)
+**Last Updated:** 2026-01-13
 **Maintained By:** AI agents and human developers
 **Update Frequency:** Any PR that changes commands, structure, conventions, or troubleshooting should update this file
