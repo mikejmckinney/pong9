@@ -7,6 +7,9 @@ import {
     GAME_WIDTH,
     MAX_BOUNCE_ANGLE_SPEED,
     MAX_PLAYERS,
+    SERVE_ANGLE_OFFSET_DEG,
+    SERVE_ANGLE_RANGE_DEG,
+    SERVE_DIRECTION_THRESHOLD,
     PADDLE_HEIGHT,
     PADDLE_MARGIN,
     PADDLE_SPEED,
@@ -172,8 +175,8 @@ export class PongRoom extends Room<GameState> {
 
     private launchBall() {
         this.resetBallToCenter();
-        const direction = Math.random() < 0.5 ? -1 : 1;
-        const angleDeg = Math.random() * 90 - 45;
+        const direction = Math.random() < SERVE_DIRECTION_THRESHOLD ? -1 : 1;
+        const angleDeg = Math.random() * SERVE_ANGLE_RANGE_DEG - SERVE_ANGLE_OFFSET_DEG;
         const angleRad = (angleDeg * Math.PI) / 180;
 
         this.ballVelocity.x = Math.cos(angleRad) * BALL_SPEED * direction;
@@ -240,9 +243,9 @@ export class PongRoom extends Room<GameState> {
             const paddleCenterY = paddleTop + PADDLE_HEIGHT / 2;
             const offset = clamp((ball.y - paddleCenterY) / (PADDLE_HEIGHT / 2), -1, 1);
 
+            this.state.ball.x = side === 'left' ? paddleRight + radius : paddleLeft - radius;
             this.ballVelocity.y = offset * MAX_BOUNCE_ANGLE_SPEED;
             this.ballVelocity.x = side === 'left' ? Math.abs(this.ballVelocity.x) : -Math.abs(this.ballVelocity.x);
-            this.state.ball.x = side === 'left' ? paddleRight + radius : paddleLeft - radius;
         }
     }
 

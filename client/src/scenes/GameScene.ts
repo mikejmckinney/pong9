@@ -18,6 +18,8 @@ import { Client, Room } from 'colyseus.js';
 import { MESSAGE_TYPES, ROOM_NAME, type GamePhase, type InputDirection, type PlayerSide } from '@shared/messages';
 import type { GameState, PlayerState } from '@shared/GameState';
 
+const NETWORK_POSITION_EPSILON = 0.5;
+
 export default class GameScene extends Phaser.Scene {
     private gridGraphics!: Phaser.GameObjects.Graphics;
     private paddle1!: Paddle;
@@ -486,7 +488,9 @@ export default class GameScene extends Phaser.Scene {
         });
 
         if (this.useNetworkBall) {
-            if (this.ball.x !== state.ball.x || this.ball.y !== state.ball.y) {
+            const deltaX = Math.abs(this.ball.x - state.ball.x);
+            const deltaY = Math.abs(this.ball.y - state.ball.y);
+            if (deltaX > NETWORK_POSITION_EPSILON || deltaY > NETWORK_POSITION_EPSILON) {
                 this.ball.setPosition(state.ball.x, state.ball.y);
             }
             const body = this.ball.body as Phaser.Physics.Arcade.Body | null;
@@ -524,14 +528,16 @@ export default class GameScene extends Phaser.Scene {
             this.isResettingBall = false;
             this.ball.reset();
             if (body) {
-                body.enable = false;
                 body.setVelocity(0, 0);
+                body.moves = false;
+                body.setImmovable(true);
             }
             return;
         }
 
         if (body) {
-            body.enable = true;
+            body.moves = true;
+            body.setImmovable(false);
             body.setVelocity(0, 0);
         }
         this.resetBall();

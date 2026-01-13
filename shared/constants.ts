@@ -9,3 +9,6 @@ export const BALL_SPEED = 500;
 export const MAX_BOUNCE_ANGLE_SPEED = 450;
 export const BALL_RESPAWN_DELAY_MS = 1000;
 export const PADDLE_MARGIN = 50;
+export const SERVE_DIRECTION_THRESHOLD = 0.5;
+export const SERVE_ANGLE_RANGE_DEG = 90;
+export const SERVE_ANGLE_OFFSET_DEG = 45;
