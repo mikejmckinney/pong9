@@ -1,10 +1,10 @@
 # Project Roadmap: Retro Pong AI
 
-## Phase 1: The Core Loop (Local Prototype)
-- [ ] Setup Phaser 3 + TypeScript environment.
-- [ ] Implement Paddle/Ball Physics (Arcade Physics).
-- [ ] Implement Synthwave Graphics (Canvas drawing, Glow effects).
-- [ ] Implement Mobile Scale Manager (FIT mode) and Touch Inputs.
+## Phase 1: The Core Loop (Local Prototype) ✅ COMPLETE
+- [x] Setup Phaser 3 + TypeScript environment.
+- [x] Implement Paddle/Ball Physics (Arcade Physics).
+- [x] Implement Synthwave Graphics (Canvas drawing, Glow effects).
+- [x] Implement Mobile Scale Manager (FIT mode) and Touch Inputs.
 
 ## Phase 2: The Network Plumbing
 - [ ] Setup Node.js + Colyseus Server.
