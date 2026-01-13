@@ -216,8 +216,13 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handleDirectionalInput(paddle: Paddle, direction: InputDirection) {
-        if (this.networkRoom && this.localSide && !this.isLocalPaddle(paddle)) {
-            return;
+        if (this.networkRoom) {
+            if (!this.localSide) {
+                return;
+            }
+            if (!this.isLocalPaddle(paddle)) {
+                return;
+            }
         }
 
         if (this.shouldUseNetworkForPaddle(paddle)) {
@@ -230,8 +235,13 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private handleStopInput(paddle: Paddle) {
-        if (this.networkRoom && this.localSide && !this.isLocalPaddle(paddle)) {
-            return;
+        if (this.networkRoom) {
+            if (!this.localSide) {
+                return;
+            }
+            if (!this.isLocalPaddle(paddle)) {
+                return;
+            }
         }
 
         if (this.shouldUseNetworkForPaddle(paddle)) {
@@ -412,8 +422,10 @@ export default class GameScene extends Phaser.Scene {
 
     private syncNetworkState(state: GameState) {
         state.players.forEach((player, sessionId) => {
-            if (this.networkRoom && sessionId === this.networkRoom.sessionId) {
+            const isLocalPlayer = this.networkRoom && sessionId === this.networkRoom.sessionId;
+            if (isLocalPlayer) {
                 this.localSide = player.side;
+                return;
             }
 
             const paddle = player.side === 'left' ? this.paddle1 : this.paddle2;
