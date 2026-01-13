@@ -390,8 +390,6 @@ export default class GameScene extends Phaser.Scene {
                 this.localSide = localPlayer.side;
             }
 
-            this.setNetworkBallMode(true);
-
             // Simplified state change handler - state is guaranteed by Colyseus
             this.networkRoom.onStateChange((state) => {
                 this.syncNetworkState(state);
@@ -420,6 +418,10 @@ export default class GameScene extends Phaser.Scene {
                 }
             });
 
+            // Sync ball mode and network status from initial room state to prevent
+            // desync when second player joins and phase is already 'playing'.
+            // onStateChange doesn't fire for already-synced initial state.
+            this.setNetworkBallMode(this.networkRoom.state.phase === 'playing');
             this.updateNetworkStatus(this.networkRoom.state.phase);
             this.sendPing();
             this.pingTimer = this.time.addEvent({
@@ -469,6 +471,8 @@ export default class GameScene extends Phaser.Scene {
         if (!this.networkRoom) {
             return;
         }
+
+        this.setNetworkBallMode(state.phase === 'playing');
 
         state.players.forEach((player, sessionId) => {
             const isLocalPlayer = sessionId === this.networkRoom!.sessionId;
