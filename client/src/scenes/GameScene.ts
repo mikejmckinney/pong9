@@ -14,7 +14,7 @@ import {
 import Paddle from '../objects/Paddle';
 import Ball from '../objects/Ball';
 import { Client, Room } from 'colyseus.js';
-import { MESSAGE_TYPES, ROOM_NAME, type GamePhase } from '@shared/messages';
+import { MESSAGE_TYPES, ROOM_NAME, type GamePhase, type InputDirection, type PlayerSide } from '@shared/messages';
 import type { GameState } from '@shared/GameState';
 
 export default class GameScene extends Phaser.Scene {
@@ -37,6 +37,8 @@ export default class GameScene extends Phaser.Scene {
     private networkClient?: Client;
     private networkRoom?: Room<GameState>;
     private pingTimer?: Phaser.Time.TimerEvent;
+    private localSide?: PlayerSide;
+    private lastInputDirection?: InputDirection;
 
     constructor() {
         super('GameScene');
@@ -181,9 +183,9 @@ export default class GameScene extends Phaser.Scene {
         zone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             const localY = pointer.y;
             if (localY < height / 2) {
-                paddle.moveUp();
+                this.handleDirectionalInput(paddle, 'up');
             } else {
-                paddle.moveDown();
+                this.handleDirectionalInput(paddle, 'down');
             }
         });
 
@@ -191,26 +193,78 @@ export default class GameScene extends Phaser.Scene {
             if (pointer.isDown) {
                 const localY = pointer.y;
                 if (localY < height / 2) {
-                    paddle.moveUp();
+                    this.handleDirectionalInput(paddle, 'up');
                 } else {
-                    paddle.moveDown();
+                    this.handleDirectionalInput(paddle, 'down');
                 }
             }
         });
 
         zone.on('pointerup', () => {
-            paddle.stopMovement();
+            this.handleStopInput(paddle);
         });
 
         // Stop paddle when pointer leaves the zone (prevents paddle moving indefinitely)
         zone.on('pointerout', () => {
-            paddle.stopMovement();
+            this.handleStopInput(paddle);
         });
 
         // Stop paddle when touch is cancelled (e.g., incoming call on mobile)
         zone.on('pointercancel', () => {
-            paddle.stopMovement();
+            this.handleStopInput(paddle);
         });
+    }
+
+    private handleDirectionalInput(paddle: Paddle, direction: InputDirection) {
+        if (this.networkRoom && this.localSide && !this.isLocalPaddle(paddle)) {
+            return;
+        }
+
+        if (this.shouldUseNetworkForPaddle(paddle)) {
+            this.sendNetworkInput(direction);
+            this.applyLocalMovement(paddle, direction);
+            return;
+        }
+
+        this.applyLocalMovement(paddle, direction);
+    }
+
+    private handleStopInput(paddle: Paddle) {
+        if (this.networkRoom && this.localSide && !this.isLocalPaddle(paddle)) {
+            return;
+        }
+
+        if (this.shouldUseNetworkForPaddle(paddle)) {
+            this.sendNetworkInput('stop');
+        }
+
+        paddle.stopMovement();
+    }
+
+    private applyLocalMovement(paddle: Paddle, direction: InputDirection) {
+        if (direction === 'up') {
+            paddle.moveUp();
+        } else if (direction === 'down') {
+            paddle.moveDown();
+        } else {
+            paddle.stopMovement();
+        }
+    }
+
+    private shouldUseNetworkForPaddle(paddle: Paddle): boolean {
+        if (!this.networkRoom || !this.localSide) {
+            return false;
+        }
+
+        return this.isLocalPaddle(paddle);
+    }
+
+    private isLocalPaddle(paddle: Paddle): boolean {
+        if (!this.localSide) {
+            return false;
+        }
+
+        return (this.localSide === 'left' && paddle === this.paddle1) || (this.localSide === 'right' && paddle === this.paddle2);
     }
 
     private setupCollisions() {
@@ -291,6 +345,7 @@ export default class GameScene extends Phaser.Scene {
 
             // Simplified state change handler - state is guaranteed by Colyseus
             this.networkRoom.onStateChange((state) => {
+                this.syncNetworkState(state);
                 this.updateNetworkStatus(state.phase);
             });
 
@@ -302,6 +357,8 @@ export default class GameScene extends Phaser.Scene {
             // Handle disconnection to prevent stale status display
             this.networkRoom.onLeave(() => {
                 this.networkRoom = undefined;
+                this.localSide = undefined;
+                this.lastInputDirection = undefined;
                 this.pingTimer?.remove();
                 this.pingTimer = undefined;
                 if (this.networkStatusText) {
@@ -351,6 +408,33 @@ export default class GameScene extends Phaser.Scene {
         } else {
             this.networkStatusText.setText('Connected: waiting for player');
         }
+    }
+
+    private syncNetworkState(state: GameState) {
+        state.players.forEach((player, sessionId) => {
+            if (this.networkRoom && sessionId === this.networkRoom.sessionId) {
+                this.localSide = player.side;
+            }
+
+            const paddle = player.side === 'left' ? this.paddle1 : this.paddle2;
+            if (paddle) {
+                paddle.setY(player.y);
+                paddle.setVelocity(0);
+            }
+        });
+    }
+
+    private sendNetworkInput(direction: InputDirection) {
+        if (!this.networkRoom) {
+            return;
+        }
+
+        if (this.lastInputDirection === direction) {
+            return;
+        }
+
+        this.lastInputDirection = direction;
+        this.networkRoom.send(MESSAGE_TYPES.INPUT, { direction });
     }
 
     private sendPing() {

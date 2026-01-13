@@ -9,6 +9,7 @@ export interface PingMessage {
 }
 
 export type GamePhase = 'waiting' | 'playing';
+export type PlayerSide = 'left' | 'right';
 
 export const MESSAGE_TYPES = {
     INPUT: 'input',
