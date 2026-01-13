@@ -6,20 +6,22 @@
 - [x] Implement Synthwave Graphics (Canvas drawing, Glow effects).
 - [x] Implement Mobile Scale Manager (FIT mode) and Touch Inputs.
 
-## Phase 2: The Network Plumbing
-- [ ] Setup Node.js + Colyseus Server.
-- [ ] Define `GameState` and `Player` Schemas.
-- [ ] Implement Room connection and "Waiting for Player" state.
-- [ ] Verify basic message passing (Ping/Pong).
+## Phase 2: The Network Plumbing ✅ COMPLETE
+- [x] Setup Node.js + Colyseus Server.
+- [x] Define `GameState` and `Player` Schemas.
+- [x] Implement Room connection and "Waiting for Player" state.
+- [x] Verify basic message passing (Ping/Pong).
 
-## Phase 3: Authoritative Physics
-- [ ] Port Physics logic from Client to Server.
-- [ ] Implement Server Simulation Loop (60Hz).
-- [ ] Implement Client-Side Prediction (Local) & Interpolation (Remote).
-- [ ] Add Power-Up Spawning Logic (Server-side).
+## Phase 3: Authoritative Physics ✅ COMPLETE
+- [x] Port Physics logic from Client to Server.
+- [x] Implement Server Simulation Loop (60Hz with drift compensation).
+- [x] Implement Client-Side Prediction (Local) & Interpolation (Remote).
+- [ ] Add Power-Up Spawning Logic (Server-side) - deferred to Phase 4.
 
 ## Phase 4: Polish & Persistence
 - [ ] Integrate Firebase v9 for Leaderboards.
-- [ ] Implement Procedural Audio (Web Audio API).
-- [ ] Finalize CSS CRT Overlays.
+- [x] Implement Procedural Audio (Web Audio API).
+- [x] Finalize CSS CRT Overlays.
+- [ ] Add Power-Up System (server-side spawning and collision).
 - [ ] Configure Dockerfile for deployment.
+- [ ] Add reconnection handling for dropped connections.

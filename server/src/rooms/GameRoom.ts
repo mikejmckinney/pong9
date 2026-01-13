@@ -1,7 +1,17 @@
 import { Room, Client } from 'colyseus';
 import { GameState, Player } from '../schemas/index.js';
 import { PlayerInput, GamePhase, PingMessage, PongMessage } from '@pong9/shared/interfaces';
-import { PADDLE_SPEED, SERVER_TICK_RATE, BALL_SPEED } from '@pong9/shared/constants';
+import { 
+  PADDLE_SPEED, 
+  SERVER_TICK_RATE, 
+  BALL_SPEED,
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  BALL_SIZE,
+  PADDLE_WIDTH,
+  PADDLE_HEIGHT,
+  WINNING_SCORE
+} from '@pong9/shared/constants';
 
 /**
  * GameRoom handles multiplayer Pong game sessions
@@ -153,14 +163,181 @@ export class GameRoom extends Room<GameState> {
     const deltaSeconds = (now - this.lastTickTime) / 1000;
     this.lastTickTime = now;
 
-    // Process player inputs
+    // Process player inputs (moves paddles)
     this.processInputs(deltaSeconds);
 
-    // Ball physics will be implemented in Phase 3
-    // For now, just update player positions based on inputs
+    // Update ball physics (movement, collisions, scoring)
+    this.updateBallPhysics(deltaSeconds);
 
     // Schedule the next tick with drift compensation
     this.scheduleNextTick();
+  }
+
+  /**
+   * Update ball physics - movement, collisions, and scoring
+   * This is the authoritative physics simulation (Phase 3)
+   */
+  private updateBallPhysics(deltaSeconds: number): void {
+    // Only update if ball has velocity
+    if (this.state.ballVelX === 0 && this.state.ballVelY === 0) return;
+
+    const halfBall = BALL_SIZE / 2;
+    
+    // Calculate new position
+    let newX = this.state.ballX + this.state.ballVelX * deltaSeconds;
+    let newY = this.state.ballY + this.state.ballVelY * deltaSeconds;
+
+    // Top/bottom wall collision (bounce)
+    if (newY - halfBall <= 0) {
+      newY = halfBall;
+      this.state.ballVelY = Math.abs(this.state.ballVelY);
+    } else if (newY + halfBall >= GAME_HEIGHT) {
+      newY = GAME_HEIGHT - halfBall;
+      this.state.ballVelY = -Math.abs(this.state.ballVelY);
+    }
+
+    // Check for paddle collisions
+    const paddleCollision = this.checkPaddleCollision(newX, newY);
+    if (paddleCollision) {
+      const { newVelX, newVelY, adjustedX } = paddleCollision;
+      this.state.ballVelX = newVelX;
+      this.state.ballVelY = newVelY;
+      newX = adjustedX;
+    }
+
+    // Left/right wall collision (scoring)
+    if (newX - halfBall <= 0) {
+      // Player 2 scores
+      this.handleScore(2);
+      return;
+    } else if (newX + halfBall >= GAME_WIDTH) {
+      // Player 1 scores
+      this.handleScore(1);
+      return;
+    }
+
+    // Update ball position
+    this.state.ballX = newX;
+    this.state.ballY = newY;
+  }
+
+  /**
+   * Check for paddle collisions and return new velocity if collision occurred
+   */
+  private checkPaddleCollision(
+    ballX: number, 
+    ballY: number
+  ): { newVelX: number; newVelY: number; adjustedX: number } | null {
+    const halfBall = BALL_SIZE / 2;
+    const halfPaddleHeight = PADDLE_HEIGHT / 2;
+    const halfPaddleWidth = PADDLE_WIDTH / 2;
+
+    // Get player paddles
+    let player1: Player | undefined;
+    let player2: Player | undefined;
+
+    for (const player of this.state.players.values()) {
+      if (player.playerNumber === 1) player1 = player;
+      else if (player.playerNumber === 2) player2 = player;
+    }
+
+    // Check Player 1 paddle (left side)
+    if (player1 && this.state.ballVelX < 0) {
+      const paddleLeft = player1.x - halfPaddleWidth;
+      const paddleRight = player1.x + halfPaddleWidth;
+      const paddleTop = player1.y - halfPaddleHeight;
+      const paddleBottom = player1.y + halfPaddleHeight;
+
+      if (ballX - halfBall <= paddleRight && 
+          ballX + halfBall >= paddleLeft &&
+          ballY + halfBall >= paddleTop && 
+          ballY - halfBall <= paddleBottom) {
+        return this.calculateBounce(player1, ballY, 1);
+      }
+    }
+
+    // Check Player 2 paddle (right side)
+    if (player2 && this.state.ballVelX > 0) {
+      const paddleLeft = player2.x - halfPaddleWidth;
+      const paddleRight = player2.x + halfPaddleWidth;
+      const paddleTop = player2.y - halfPaddleHeight;
+      const paddleBottom = player2.y + halfPaddleHeight;
+
+      if (ballX + halfBall >= paddleLeft && 
+          ballX - halfBall <= paddleRight &&
+          ballY + halfBall >= paddleTop && 
+          ballY - halfBall <= paddleBottom) {
+        return this.calculateBounce(player2, ballY, -1);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate ball bounce off paddle based on where it hits
+   */
+  private calculateBounce(
+    paddle: Player, 
+    ballY: number, 
+    direction: 1 | -1
+  ): { newVelX: number; newVelY: number; adjustedX: number } {
+    const halfPaddleHeight = PADDLE_HEIGHT / 2;
+    const halfPaddleWidth = PADDLE_WIDTH / 2;
+    const halfBall = BALL_SIZE / 2;
+
+    // Calculate relative intersection (-1 to 1)
+    const relativeIntersect = (paddle.y - ballY) / halfPaddleHeight;
+    
+    // Calculate bounce angle (max 60 degrees)
+    const maxBounceAngle = Math.PI / 3; // 60 degrees
+    const bounceAngle = relativeIntersect * maxBounceAngle;
+
+    // Current speed with slight increase (capped at 2x base speed)
+    const currentSpeed = Math.sqrt(
+      this.state.ballVelX * this.state.ballVelX + 
+      this.state.ballVelY * this.state.ballVelY
+    );
+    const newSpeed = Math.min(currentSpeed * 1.05, BALL_SPEED * 2);
+
+    // Calculate new velocities
+    const newVelX = direction * newSpeed * Math.cos(bounceAngle);
+    const newVelY = -newSpeed * Math.sin(bounceAngle);
+
+    // Adjust X position to avoid ball getting stuck in paddle
+    const adjustedX = direction === 1 
+      ? paddle.x + halfPaddleWidth + halfBall + 1
+      : paddle.x - halfPaddleWidth - halfBall - 1;
+
+    return { newVelX, newVelY, adjustedX };
+  }
+
+  /**
+   * Handle scoring - update score and reset ball or end game
+   */
+  private handleScore(player: 1 | 2): void {
+    if (player === 1) {
+      this.state.score1++;
+      console.log(`[GameRoom] Player 1 scores! Score: ${this.state.score1}-${this.state.score2}`);
+    } else {
+      this.state.score2++;
+      console.log(`[GameRoom] Player 2 scores! Score: ${this.state.score1}-${this.state.score2}`);
+    }
+
+    // Check for winner
+    if (this.state.score1 >= WINNING_SCORE) {
+      this.state.winner = 1;
+      this.endGame('Player 1 wins!');
+      return;
+    } else if (this.state.score2 >= WINNING_SCORE) {
+      this.state.winner = 2;
+      this.endGame('Player 2 wins!');
+      return;
+    }
+
+    // Reset ball to center and launch after delay
+    this.state.resetBall();
+    setTimeout(() => this.launchBall(), 1000);
   }
 
   /**
@@ -188,15 +365,13 @@ export class GameRoom extends Room<GameState> {
 
   /**
    * Launch the ball with a random direction
-   * Full physics will be in Phase 3, this is just placeholder velocity
    */
   private launchBall(): void {
     if (this.state.phase !== GamePhase.PLAYING) return;
     
-    // For Phase 2, just set initial velocity
-    // Full physics implementation in Phase 3
+    // Random direction: -30 to +30 degrees
     const direction = Math.random() > 0.5 ? 1 : -1;
-    const angle = (Math.random() - 0.5) * Math.PI / 3; // -30 to +30 degrees
+    const angle = (Math.random() - 0.5) * Math.PI / 3;
     
     this.state.ballVelX = direction * BALL_SPEED * Math.cos(angle);
     this.state.ballVelY = BALL_SPEED * Math.sin(angle);
@@ -205,13 +380,13 @@ export class GameRoom extends Room<GameState> {
   }
 
   /**
-   * End the game (player disconnection or other reason)
+   * End the game (player disconnection, winner, or other reason)
    */
-  private endGame(): void {
-    console.log(`[GameRoom] Ending game in room ${this.roomId}`);
+  private endGame(reason: string = 'Player disconnected'): void {
+    console.log(`[GameRoom] Ending game in room ${this.roomId}: ${reason}`);
     this.state.phase = GamePhase.FINISHED;
     this.stopSimulation();
-    this.broadcast('gameEnd', { reason: 'Player disconnected' });
+    this.broadcast('gameEnd', { reason });
   }
 
   /**
