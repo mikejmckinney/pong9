@@ -422,7 +422,9 @@ export default class GameScene extends Phaser.Scene {
         state.players.forEach((player, sessionId) => {
             const isLocalPlayer = this.networkRoom && sessionId === this.networkRoom.sessionId;
             if (isLocalPlayer) {
-                this.localSide = player.side;
+                if (!this.localSide) {
+                    this.localSide = player.side;
+                }
                 return;
             }
 
