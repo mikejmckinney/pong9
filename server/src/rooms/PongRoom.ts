@@ -1,15 +1,14 @@
 import { Client, Room } from 'colyseus';
 import { GameState, PlayerState } from '../../../shared/GameState';
 import { GAME_HEIGHT, PADDLE_HEIGHT, PADDLE_SPEED, MAX_PLAYERS } from '../../../shared/constants';
-import { InputDirection, InputMessage, MESSAGE_TYPES } from '../../../shared/messages';
+import { InputDirection, InputMessage, MESSAGE_TYPES, PlayerSide } from '../../../shared/messages';
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
-// Map to store each player's current intended direction for time-based movement
-const playerDirections = new Map<string, InputDirection>();
-
 export class PongRoom extends Room<GameState> {
     maxClients = MAX_PLAYERS;
+    // Map to store each player's current intended direction for time-based movement
+    private playerDirections = new Map<string, InputDirection>();
 
     onCreate() {
         this.setState(new GameState());
@@ -26,10 +25,24 @@ export class PongRoom extends Room<GameState> {
     }
 
     onJoin(client: Client) {
+        // Get available side with error handling
+        // While maxClients=2 should prevent overflow, this guards against edge cases
+        // (e.g., reconnection logic, future maxClients changes)
+        let side: PlayerSide;
+        try {
+            side = this.getAvailableSide();
+        } catch (error) {
+            console.error('Failed to assign player side:', error);
+            // Disconnect the client if no side is available
+            client.leave();
+            return;
+        }
+
         const player = new PlayerState();
         player.sessionId = client.sessionId;
+        player.side = side;
         this.state.players.set(client.sessionId, player);
-        playerDirections.set(client.sessionId, 'stop');
+        this.playerDirections.set(client.sessionId, 'stop');
 
         if (this.state.players.size >= MAX_PLAYERS) {
             this.state.phase = 'playing';
@@ -40,7 +53,7 @@ export class PongRoom extends Room<GameState> {
 
     onLeave(client: Client) {
         this.state.players.delete(client.sessionId);
-        playerDirections.delete(client.sessionId);
+        this.playerDirections.delete(client.sessionId);
         this.state.phase = 'waiting';
     }
 
@@ -55,7 +68,7 @@ export class PongRoom extends Room<GameState> {
         }
 
         // Queue the direction; movement will be applied in updateState with deltaTime
-        playerDirections.set(client.sessionId, message.direction);
+        this.playerDirections.set(client.sessionId, message.direction);
     }
 
     /**
@@ -67,7 +80,7 @@ export class PongRoom extends Room<GameState> {
         const dt = deltaTime / 1000;
 
         this.state.players.forEach((player) => {
-            const direction = playerDirections.get(player.sessionId) ?? 'stop';
+            const direction = this.playerDirections.get(player.sessionId) ?? 'stop';
 
             if (direction === 'up') {
                 player.y -= PADDLE_SPEED * dt;
@@ -80,5 +93,20 @@ export class PongRoom extends Room<GameState> {
         });
 
         // Reserved for future server-side simulation (ball physics, scoring).
+    }
+
+    private getAvailableSide(): PlayerSide {
+        const usedSides = new Set<PlayerSide>();
+        this.state.players.forEach((player) => usedSides.add(player.side));
+
+        if (!usedSides.has('left')) {
+            return 'left';
+        }
+
+        if (!usedSides.has('right')) {
+            return 'right';
+        }
+
+        throw new Error('No available player sides for this room');
     }
 }

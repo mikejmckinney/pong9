@@ -9,12 +9,13 @@ import {
     BALL_LAUNCH_DELAY_MS,
     MAX_BOUNCE_ANGLE_SPEED,
     BLOOM_STRENGTH,
-    BLOOM_BLUR_STRENGTH
+    BLOOM_BLUR_STRENGTH,
+    PADDLE_HEIGHT
 } from '../config/constants';
 import Paddle from '../objects/Paddle';
 import Ball from '../objects/Ball';
 import { Client, Room } from 'colyseus.js';
-import { MESSAGE_TYPES, ROOM_NAME, type GamePhase } from '@shared/messages';
+import { MESSAGE_TYPES, ROOM_NAME, type GamePhase, type InputDirection, type PlayerSide } from '@shared/messages';
 import type { GameState } from '@shared/GameState';
 
 export default class GameScene extends Phaser.Scene {
@@ -37,6 +38,8 @@ export default class GameScene extends Phaser.Scene {
     private networkClient?: Client;
     private networkRoom?: Room<GameState>;
     private pingTimer?: Phaser.Time.TimerEvent;
+    private localSide?: PlayerSide;
+    private lastInputDirection?: InputDirection;
 
     constructor() {
         super('GameScene');
@@ -181,9 +184,9 @@ export default class GameScene extends Phaser.Scene {
         zone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
             const localY = pointer.y;
             if (localY < height / 2) {
-                paddle.moveUp();
+                this.handleDirectionalInput(paddle, 'up');
             } else {
-                paddle.moveDown();
+                this.handleDirectionalInput(paddle, 'down');
             }
         });
 
@@ -191,26 +194,96 @@ export default class GameScene extends Phaser.Scene {
             if (pointer.isDown) {
                 const localY = pointer.y;
                 if (localY < height / 2) {
-                    paddle.moveUp();
+                    this.handleDirectionalInput(paddle, 'up');
                 } else {
-                    paddle.moveDown();
+                    this.handleDirectionalInput(paddle, 'down');
                 }
             }
         });
 
         zone.on('pointerup', () => {
-            paddle.stopMovement();
+            this.handleStopInput(paddle);
         });
 
         // Stop paddle when pointer leaves the zone (prevents paddle moving indefinitely)
         zone.on('pointerout', () => {
-            paddle.stopMovement();
+            this.handleStopInput(paddle);
         });
 
         // Stop paddle when touch is cancelled (e.g., incoming call on mobile)
         zone.on('pointercancel', () => {
-            paddle.stopMovement();
+            this.handleStopInput(paddle);
         });
+    }
+
+    private handleDirectionalInput(paddle: Paddle, direction: InputDirection) {
+        if (!this.canHandleInput(paddle)) {
+            return;
+        }
+
+        if (this.isNetworkControlledPaddle(paddle)) {
+            this.sendNetworkInput(direction);
+            this.applyLocalMovement(paddle, direction);
+            return;
+        }
+
+        this.applyLocalMovement(paddle, direction);
+    }
+
+    private handleStopInput(paddle: Paddle) {
+        // Always stop the paddle to prevent velocity persistence when network mode changes
+        // (e.g., transitioning from offline to online mode mid-touch)
+        this.applyLocalMovement(paddle, 'stop');
+
+        if (!this.canHandleInput(paddle)) {
+            return;
+        }
+
+        if (this.isNetworkControlledPaddle(paddle)) {
+            this.sendNetworkInput('stop');
+        }
+    }
+
+    private applyLocalMovement(paddle: Paddle, direction: InputDirection) {
+        if (direction === 'up') {
+            paddle.moveUp();
+        } else if (direction === 'down') {
+            paddle.moveDown();
+        } else {
+            paddle.stopMovement();
+        }
+    }
+
+    /**
+     * Helper method to get a paddle by player side.
+     * Centralizes the mapping from PlayerSide to Paddle instance.
+     */
+    private getPaddleBySide(side: PlayerSide): Paddle {
+        return side === 'left' ? this.paddle1 : this.paddle2;
+    }
+
+    private isLocalPaddle(paddle: Paddle): boolean {
+        if (!this.localSide) {
+            return false;
+        }
+
+        return paddle === this.getPaddleBySide(this.localSide);
+    }
+
+    private canHandleInput(paddle: Paddle): boolean {
+        if (!this.networkRoom) {
+            return true;
+        }
+
+        if (!this.localSide) {
+            return false;
+        }
+
+        return this.isLocalPaddle(paddle);
+    }
+
+    private isNetworkControlledPaddle(paddle: Paddle): boolean {
+        return Boolean(this.networkRoom && this.localSide && this.isLocalPaddle(paddle));
     }
 
     private setupCollisions() {
@@ -289,8 +362,16 @@ export default class GameScene extends Phaser.Scene {
                 return;
             }
 
+            // Initialize localSide immediately from initial room state to prevent
+            // input unresponsiveness while waiting for first onStateChange
+            const localPlayer = this.networkRoom.state.players.get(this.networkRoom.sessionId);
+            if (localPlayer) {
+                this.localSide = localPlayer.side;
+            }
+
             // Simplified state change handler - state is guaranteed by Colyseus
             this.networkRoom.onStateChange((state) => {
+                this.syncNetworkState(state);
                 this.updateNetworkStatus(state.phase);
             });
 
@@ -302,6 +383,8 @@ export default class GameScene extends Phaser.Scene {
             // Handle disconnection to prevent stale status display
             this.networkRoom.onLeave(() => {
                 this.networkRoom = undefined;
+                this.localSide = undefined;
+                this.lastInputDirection = undefined;
                 this.pingTimer?.remove();
                 this.pingTimer = undefined;
                 if (this.networkStatusText) {
@@ -351,6 +434,47 @@ export default class GameScene extends Phaser.Scene {
         } else {
             this.networkStatusText.setText('Connected: waiting for player');
         }
+    }
+
+    private syncNetworkState(state: GameState) {
+        // Guard against race condition if room disconnects during state update
+        if (!this.networkRoom) {
+            return;
+        }
+
+        state.players.forEach((player, sessionId) => {
+            const isLocalPlayer = sessionId === this.networkRoom!.sessionId;
+            if (isLocalPlayer) {
+                if (!this.localSide) {
+                    this.localSide = player.side;
+                }
+                // Skip syncing local player position - use client-side prediction
+                // Phase 3 will add reconciliation when deviation exceeds threshold
+                return;
+            }
+
+            // Convert server's top-edge Y to Phaser's center-based Y coordinate
+            // Server stores paddle position as top edge (clamped to [0, GAME_HEIGHT - PADDLE_HEIGHT])
+            // Phaser sprites use center-based coordinates
+            const centerY = player.y + PADDLE_HEIGHT / 2;
+            const paddle = this.getPaddleBySide(player.side);
+            if (paddle) {
+                paddle.setY(centerY);
+            }
+        });
+    }
+
+    private sendNetworkInput(direction: InputDirection) {
+        if (!this.networkRoom) {
+            return;
+        }
+
+        if (this.lastInputDirection === direction) {
+            return;
+        }
+
+        this.lastInputDirection = direction;
+        this.networkRoom.send(MESSAGE_TYPES.INPUT, { direction });
     }
 
     private sendPing() {

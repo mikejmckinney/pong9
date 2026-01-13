@@ -1,11 +1,12 @@
 import { MapSchema, Schema, type } from '@colyseus/schema';
 import { BALL_SIZE, GAME_HEIGHT, GAME_WIDTH, PADDLE_HEIGHT } from './constants';
-import type { GamePhase } from './messages';
+import type { GamePhase, PlayerSide } from './messages';
 
 export class PlayerState extends Schema {
     @type('string') sessionId: string = '';
     @type('number') y: number = (GAME_HEIGHT - PADDLE_HEIGHT) / 2;
     @type('number') score: number = 0;
+    @type('string') side: PlayerSide = 'left';
 }
 
 export class BallState extends Schema {
