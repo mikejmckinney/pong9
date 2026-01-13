@@ -267,32 +267,54 @@ export default class GameScene extends Phaser.Scene {
             color: '#04c4ca'
         }).setOrigin(0.5);
 
+        // Track pending connection to handle cleanup if scene is destroyed during connect
+        let pendingConnection = true;
+
+        // Register cleanup handler BEFORE the await to prevent resource leak
+        // if scene is destroyed while connection is pending
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+            pendingConnection = false;
+            this.pingTimer?.remove();
+            void this.networkRoom?.leave();
+        });
+
         try {
             const endpoint = this.getServerEndpoint();
             this.networkClient = new Client(endpoint);
             this.networkRoom = await this.networkClient.joinOrCreate<GameState>(ROOM_NAME);
 
+            // If scene was destroyed during await, clean up and exit
+            if (!pendingConnection) {
+                void this.networkRoom.leave();
+                return;
+            }
+
+            // Simplified state change handler - state is guaranteed by Colyseus
             this.networkRoom.onStateChange((state) => {
-                const phase = (state as GameState | undefined)?.phase ?? 'waiting';
-                this.updateNetworkStatus(phase as GamePhase);
+                this.updateNetworkStatus(state.phase);
             });
 
             this.networkRoom.onMessage(MESSAGE_TYPES.PONG, () => {
                 const phase = this.networkRoom?.state.phase ?? 'waiting';
-                this.updateNetworkStatus(phase as GamePhase);
+                this.updateNetworkStatus(phase);
             });
 
-            this.updateNetworkStatus(this.networkRoom.state.phase as GamePhase);
+            // Handle disconnection to prevent stale status display
+            this.networkRoom.onLeave(() => {
+                this.networkRoom = undefined;
+                this.pingTimer?.remove();
+                this.pingTimer = undefined;
+                if (this.networkStatusText) {
+                    this.networkStatusText.setText('Disconnected: local play');
+                }
+            });
+
+            this.updateNetworkStatus(this.networkRoom.state.phase);
             this.sendPing();
             this.pingTimer = this.time.addEvent({
                 delay: 10000,
                 loop: true,
                 callback: () => this.sendPing()
-            });
-
-            this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
-                this.pingTimer?.remove();
-                void this.networkRoom?.leave();
             });
         } catch (error) {
             console.warn('Colyseus connection failed; continuing with local play only.', error);

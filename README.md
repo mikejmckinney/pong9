@@ -41,7 +41,7 @@ Then open http://localhost:3000 in your browser!
 ### Run the Colyseus server (Phase 2 scaffolding)
 
 ```bash
-cd pong9/server
+cd server
 npm install
 npm run dev   # starts on ws://localhost:2567
 ```
