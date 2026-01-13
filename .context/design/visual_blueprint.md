@@ -48,7 +48,7 @@ export default class GameScene extends Phaser.Scene {
 
         // Tweak these values during development to match the visual target concept.
         bloom.setStrength(1.5); // Intensity of the glow
-        bloom.blurStrength = 2;       // Spread of the glow
+        bloom.setBlur(2);       // Spread of the glow
 
         // 4. Generate the Procedural Grid underneath everything
         this.createProceduralGrid(width, height);
