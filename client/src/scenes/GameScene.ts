@@ -1,5 +1,13 @@
 import Phaser from 'phaser';
-import { COLORS } from '../config/constants';
+import { 
+    COLORS, 
+    GRID_PERSPECTIVE_SPACING, 
+    GRID_HORIZONTAL_SPACING, 
+    CENTER_LINE_DASH_LENGTH, 
+    CENTER_LINE_GAP_LENGTH,
+    BALL_LAUNCH_DELAY_MS,
+    MAX_BOUNCE_ANGLE_SPEED
+} from '../config/constants';
 import Paddle from '../objects/Paddle';
 import Ball from '../objects/Ball';
 
@@ -65,7 +73,7 @@ export default class GameScene extends Phaser.Scene {
         this.setupCollisions();
 
         // Reset ball to start
-        this.time.delayedCall(1000, () => {
+        this.time.delayedCall(BALL_LAUNCH_DELAY_MS, () => {
             this.ball.launch();
         });
     }
@@ -97,14 +105,14 @@ export default class GameScene extends Phaser.Scene {
         const centerX = width / 2;
 
         // Draw perspective lines
-        for (let i = -width; i < width * 2; i += 100) {
+        for (let i = -width; i < width * 2; i += GRID_PERSPECTIVE_SPACING) {
             this.gridGraphics.moveTo(centerX, horizonY);
             this.gridGraphics.lineTo(i, height);
         }
         this.gridGraphics.strokePath();
 
         // Draw horizontal lines
-        for (let y = horizonY; y < height; y += 40) {
+        for (let y = horizonY; y < height; y += GRID_HORIZONTAL_SPACING) {
             this.gridGraphics.moveTo(0, y);
             this.gridGraphics.lineTo(width, y);
         }
@@ -116,11 +124,9 @@ export default class GameScene extends Phaser.Scene {
         graphics.lineStyle(4, COLORS.GRID, 0.8);
         
         // Dashed center line
-        const dashLength = 20;
-        const gapLength = 20;
-        for (let y = 0; y < height; y += dashLength + gapLength) {
+        for (let y = 0; y < height; y += CENTER_LINE_DASH_LENGTH + CENTER_LINE_GAP_LENGTH) {
             graphics.moveTo(width / 2, y);
-            graphics.lineTo(width / 2, Math.min(y + dashLength, height));
+            graphics.lineTo(width / 2, Math.min(y + CENTER_LINE_DASH_LENGTH, height));
         }
         graphics.strokePath();
     }
@@ -186,19 +192,45 @@ export default class GameScene extends Phaser.Scene {
     }
 
     private setupCollisions() {
-        // Ball collides with paddles
-        this.physics.add.collider(this.ball, this.paddle1, () => {
-            this.ball.reverseX();
+        // Ball collides with paddles - adjust angle based on hit position
+        this.physics.add.collider(this.ball, this.paddle1, (ballObj, paddleObj) => {
+            const ballBody = (ballObj as Ball).body as Phaser.Physics.Arcade.Body;
+            const paddleBody = (paddleObj as Paddle).body as Phaser.Physics.Arcade.Body;
+
+            const paddleCenterY = paddleBody.y + paddleBody.height / 2;
+            const ballCenterY = ballBody.y + ballBody.height / 2;
+            let offset = (ballCenterY - paddleCenterY) / (paddleBody.height / 2);
+
+            // Clamp offset to [-1, 1] to avoid extreme angles
+            offset = Phaser.Math.Clamp(offset, -1, 1);
+
+            ballBody.velocity.y = offset * MAX_BOUNCE_ANGLE_SPEED;
+
+            // Reverse horizontal direction to bounce the ball back
+            ballBody.velocity.x = -ballBody.velocity.x;
         });
 
-        this.physics.add.collider(this.ball, this.paddle2, () => {
-            this.ball.reverseX();
+        this.physics.add.collider(this.ball, this.paddle2, (ballObj, paddleObj) => {
+            const ballBody = (ballObj as Ball).body as Phaser.Physics.Arcade.Body;
+            const paddleBody = (paddleObj as Paddle).body as Phaser.Physics.Arcade.Body;
+
+            const paddleCenterY = paddleBody.y + paddleBody.height / 2;
+            const ballCenterY = ballBody.y + ballBody.height / 2;
+            let offset = (ballCenterY - paddleCenterY) / (paddleBody.height / 2);
+
+            // Clamp offset to [-1, 1] to avoid extreme angles
+            offset = Phaser.Math.Clamp(offset, -1, 1);
+
+            ballBody.velocity.y = offset * MAX_BOUNCE_ANGLE_SPEED;
+
+            // Reverse horizontal direction to bounce the ball back
+            ballBody.velocity.x = -ballBody.velocity.x;
         });
     }
 
     private resetBall() {
         this.ball.reset();
-        this.time.delayedCall(1000, () => {
+        this.time.delayedCall(BALL_LAUNCH_DELAY_MS, () => {
             this.ball.launch();
         });
     }

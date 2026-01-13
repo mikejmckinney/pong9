@@ -40,14 +40,7 @@ export default class Paddle extends Phaser.Physics.Arcade.Sprite {
     }
 
     update() {
-        // Keep paddle within bounds (additional check)
-        const halfHeight = this.displayHeight / 2;
-        if (this.y < halfHeight) {
-            this.y = halfHeight;
-            this.setVelocityY(0);
-        } else if (this.y > this.scene.scale.height - halfHeight) {
-            this.y = this.scene.scale.height - halfHeight;
-            this.setVelocityY(0);
-        }
+        // World bounds are enforced via setCollideWorldBounds(true) in the constructor.
+        // No additional per-frame paddle logic is required here at the moment.
     }
 }

@@ -39,12 +39,17 @@ export default class Ball extends Phaser.Physics.Arcade.Sprite {
     }
 
     reverseX() {
+        const body = this.body;
+        if (!(body instanceof Phaser.Physics.Arcade.Body)) {
+            return;
+        }
+
         // Reverse horizontal direction and add slight vertical variation
-        this.setVelocityX(-this.body!.velocity.x);
+        this.setVelocityX(-body.velocity.x);
         
         // Add small random vertical component to make gameplay more interesting
         const verticalVariation = Phaser.Math.Between(-50, 50);
-        this.setVelocityY(this.body!.velocity.y + verticalVariation);
+        this.setVelocityY(body.velocity.y + verticalVariation);
     }
 
     reset() {

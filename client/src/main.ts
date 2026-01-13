@@ -21,16 +21,7 @@ window.addEventListener('orientationchange', checkOrientation);
 // Initialize Phaser game
 new Phaser.Game(config);
 
-// Unlock audio context on first user interaction
-let audioUnlocked = false;
-const unlockAudio = () => {
-    if (!audioUnlocked) {
-        // This will be used in Phase 4 for Web Audio API
-        audioUnlocked = true;
-        document.removeEventListener('touchstart', unlockAudio);
-        document.removeEventListener('click', unlockAudio);
-    }
-};
-
-document.addEventListener('touchstart', unlockAudio);
-document.addEventListener('click', unlockAudio);
+// TODO: Phase 4 - Unlock audio context on first user interaction for Web Audio API
+// This placeholder will be implemented when adding procedural audio effects
+// The audioUnlocked flag and unlockAudio function will initialize the Web Audio API context
+// to comply with browser autoplay policies that require user interaction before playing audio.
