@@ -45,6 +45,8 @@ export default class GameScene extends Phaser.Scene {
     private lastInputDirection?: InputDirection;
     private useNetworkBall: boolean = false;
     private localLaunchTimer?: Phaser.Time.TimerEvent;
+    private paddle1Collider?: Phaser.Physics.Arcade.Collider;
+    private paddle2Collider?: Phaser.Physics.Arcade.Collider;
 
     constructor() {
         super('GameScene');
@@ -302,11 +304,12 @@ export default class GameScene extends Phaser.Scene {
 
     private setupCollisions() {
         // Ball collides with paddles - adjust angle based on hit position
-        this.physics.add.collider(this.ball, this.paddle1, (ballObj, paddleObj) => {
+        // Store colliders as class properties so they can be toggled in network mode
+        this.paddle1Collider = this.physics.add.collider(this.ball, this.paddle1, (ballObj, paddleObj) => {
             this.handlePaddleCollision(ballObj as Ball, paddleObj as Paddle);
         });
 
-        this.physics.add.collider(this.ball, this.paddle2, (ballObj, paddleObj) => {
+        this.paddle2Collider = this.physics.add.collider(this.ball, this.paddle2, (ballObj, paddleObj) => {
             this.handlePaddleCollision(ballObj as Ball, paddleObj as Paddle);
         });
     }
@@ -519,6 +522,16 @@ export default class GameScene extends Phaser.Scene {
 
         this.useNetworkBall = enabled;
         const body = this.ball.body as Phaser.Physics.Arcade.Body | null;
+
+        // Toggle ball-paddle colliders to prevent local collision logic from
+        // interfering with server-authoritative state during online play.
+        // This fixes visual "jumps" when server state corrects the ball position.
+        if (this.paddle1Collider) {
+            this.paddle1Collider.active = !enabled;
+        }
+        if (this.paddle2Collider) {
+            this.paddle2Collider.active = !enabled;
+        }
 
         if (enabled) {
             this.localLaunchTimer?.remove();
