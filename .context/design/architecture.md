@@ -46,29 +46,29 @@ sequenceDiagram
     P->>C: Tap Screen (e.g., "Move Up")
     
     rect rgb(240, 248, 255)
-    note right of C: ⚡ LOCAL PREDICTION
-    C->>C: Immediately move local paddle Y position
+        note right of C: ⚡ LOCAL PREDICTION
+        C->>C: Immediately move local paddle Y position
     end
     
     C->>S: Send Input Message { intent: "UP" } (via WS)
 
     rect rgb(255, 245, 235)
-    note left of S: 🧠 AUTHORITATIVE SIMULATION (60Hz Tick)
-    S->>S: Receive Input
-    S->>S: Validate Input (Is move allowed?)
-    S->>S: Run Physics Step (Move paddles, update ball pos)
-    S->>S: Detect Collisions (Ball hits wall/paddle)
-    S->>S: Update Colyseus State Schema
+        note left of S: 🧠 AUTHORITATIVE SIMULATION (60Hz Tick)
+        S->>S: Receive Input
+        S->>S: Validate Input (Is move allowed?)
+        S->>S: Run Physics Step (Move paddles, update ball pos)
+        S->>S: Detect Collisions (Ball hits wall/paddle)
+        S->>S: Update Colyseus State Schema
     end
 
     S-->>C: Broadcast State Delta Patch (via WS)
 
     rect rgb(240, 248, 255)
-    note right of C: 🔄 RECONCILIATION
-    C->>C: Receive Server State
-    C->>C: Compare Server Paddle Y vs Local Paddle Y
-    C->>C: Correct Local position if deviation > threshold
-    C->>C: Interpolate (smooth) remote player paddle/ball positions
+        note right of C: 🔄 RECONCILIATION
+        C->>C: Receive Server State
+        C->>C: Compare Server Paddle Y vs Local Paddle Y
+        C->>C: Correct Local position if deviation > threshold
+        C->>C: Interpolate (smooth) remote player paddle/ball positions
     end
 
     C->>P: Render Updated Frame
@@ -82,7 +82,7 @@ classDiagram
     %% Definitions based on Colyseus Schema
     class GameState {
         <<Schema>>
-        +Map~string, Player~ players
+        +Map<string, Player> players
         +Ball ball
         +string roomState (waiting|playing|finished)
     }

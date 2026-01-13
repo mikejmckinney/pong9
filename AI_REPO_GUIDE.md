@@ -29,6 +29,9 @@ This is a **template repository** for building a mobile-first multiplayer Pong g
 │   │   ├── domain_ui.md  # UI/graphics specifications (Synthwave aesthetic)
 │   │   ├── domain_net.md # Networking and physics patterns
 │   │   └── domain_qa.md  # Testing strategy and QA requirements
+│   ├── design/           # Visual and architectural design specifications
+│   │   ├── architecture.md      # Mermaid diagrams for system architecture
+│   │   └── visual_blueprint.md  # Phaser 3 Synthwave reference implementation
 │   ├── state/            # Current project state
 │   │   └── active_task.md # Tracks current phase and active work
 │   └── roadmap.md        # Four-phase development plan
