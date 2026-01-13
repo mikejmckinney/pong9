@@ -225,7 +225,8 @@ export default class GameScene extends Phaser.Scene {
             }
         }
 
-        if (this.shouldUseNetworkForPaddle(paddle)) {
+        const useNetwork = Boolean(this.networkRoom && this.localSide && this.isLocalPaddle(paddle));
+        if (useNetwork) {
             this.sendNetworkInput(direction);
             this.applyLocalMovement(paddle, direction);
             return;
@@ -244,7 +245,8 @@ export default class GameScene extends Phaser.Scene {
             }
         }
 
-        if (this.shouldUseNetworkForPaddle(paddle)) {
+        const useNetwork = Boolean(this.networkRoom && this.localSide && this.isLocalPaddle(paddle));
+        if (useNetwork) {
             this.sendNetworkInput('stop');
         }
 
@@ -259,14 +261,6 @@ export default class GameScene extends Phaser.Scene {
         } else {
             paddle.stopMovement();
         }
-    }
-
-    private shouldUseNetworkForPaddle(paddle: Paddle): boolean {
-        if (!this.networkRoom || !this.localSide) {
-            return false;
-        }
-
-        return this.isLocalPaddle(paddle);
     }
 
     private isLocalPaddle(paddle: Paddle): boolean {
@@ -431,7 +425,7 @@ export default class GameScene extends Phaser.Scene {
             const paddle = player.side === 'left' ? this.paddle1 : this.paddle2;
             if (paddle) {
                 paddle.setY(player.y);
-                paddle.setVelocity(0);
+                paddle.setVelocity(0, 0);
             }
         });
     }
