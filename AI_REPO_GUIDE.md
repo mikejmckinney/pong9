@@ -228,7 +228,7 @@ From `.context/roadmap.md`:
 
 1. **AI_REPO_GUIDE.md must exist** - Agents require this file. If missing or stale, follow `.github/prompts/repo-onboarding.md` to create it.
 
-2. **copilot-instructions.md is generic** - It currently has placeholder content. Run copilot-onboarding after creating this guide.
+2. **copilot-instructions.md is configured** - This repo uses repository-specific Copilot instructions in `.github/copilot-instructions.md`. If those instructions become stale after major workflow or structure changes, refresh them using `.github/prompts/copilot-onboarding.md` once this guide is up to date.
 
 3. **No actual codebase yet** - This is a template repository with instructions but no game implementation.
 
@@ -273,11 +273,11 @@ From `.context/roadmap.md`:
 - Set `DOTFILES` to point to this repository
 - Or run directly: `WORKSPACE=/path/to/workspace bash install.sh`
 
-### Copilot Instructions Seem Generic
+### Copilot Instructions Seem Out-of-Date
 
-**Problem:** `.github/copilot-instructions.md` doesn't have repo-specific details
+**Problem:** `.github/copilot-instructions.md` appears inconsistent with this guide or recent repository changes.
 
-**Solution:** Follow `.github/prompts/copilot-onboarding.md` to update it with specific commands and conventions after AI_REPO_GUIDE.md is created and accurate.
+**Solution:** Treat `.github/copilot-instructions.md` as the canonical reference for editor/agent integrations. When commands, structure, or conventions change, update both this file and `.github/copilot-instructions.md` in the same PR. If the Copilot instructions drift or become generic again, re-run the workflow in `.github/prompts/copilot-onboarding.md` to regenerate them after first updating this guide.
 
 ### Agent State is Unclear
 

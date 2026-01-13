@@ -147,8 +147,8 @@ Always verify:
 
 ### Future Phases
 Follow the four-phase roadmap:
-1. **Phase 1:** Core Loop (Phaser setup, physics, graphics, mobile controls)
-2. **Phase 2:** Network Plumbing (Colyseus server, room connection)
+1. **Phase 1:** The Core Loop (Phaser setup, physics, graphics, mobile controls)
+2. **Phase 2:** The Network Plumbing (Colyseus server, room connection)
 3. **Phase 3:** Authoritative Physics (server simulation, prediction, interpolation)
 4. **Phase 4:** Polish & Persistence (Firebase, audio, deployment)
 

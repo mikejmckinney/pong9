@@ -60,8 +60,8 @@ bash test.sh
 
 See [`.context/roadmap.md`](.context/roadmap.md) for the complete four-phase plan:
 
-1. **Phase 1:** Core Loop (Local Prototype)
-2. **Phase 2:** Network Plumbing
+1. **Phase 1:** The Core Loop (Local Prototype)
+2. **Phase 2:** The Network Plumbing
 3. **Phase 3:** Authoritative Physics
 4. **Phase 4:** Polish & Persistence
 
