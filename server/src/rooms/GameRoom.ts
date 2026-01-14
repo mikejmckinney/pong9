@@ -23,6 +23,9 @@ import {
  * GameRoom handles multiplayer Pong game sessions
  * Per domain_net.md: Server runs physics at 60Hz, client sends intent not position
  */
+// Reconnection grace period in seconds
+const RECONNECTION_TIMEOUT = 30;
+
 export class GameRoom extends Room<GameState> {
   // Map of session IDs to player numbers (1 or 2)
   private playerNumbers = new Map<string, 1 | 2>();
@@ -41,6 +44,10 @@ export class GameRoom extends Room<GameState> {
   private powerUpIdCounter: number = 0;
   // Ball speed modifier from power-ups
   private ballSpeedModifier: number = 1;
+  // Reconnection tracking: maps player numbers to disconnection timeouts
+  private disconnectionTimeouts = new Map<1 | 2, ReturnType<typeof setTimeout>>();
+  // Track disconnected player info for reconnection
+  private disconnectedPlayers = new Map<1 | 2, { sessionId: string; x: number; y: number }>();
 
   onCreate(): void {
     this.setState(new GameState());
@@ -56,13 +63,32 @@ export class GameRoom extends Room<GameState> {
   onJoin(client: Client): void {
     console.log(`[GameRoom] Player ${client.sessionId} joined room ${this.roomId}`);
 
-    // Determine player number (first player is P1, second is P2)
-    const playerNumber = this.playerNumbers.size === 0 ? 1 : 2;
-    this.playerNumbers.set(client.sessionId, playerNumber as 1 | 2);
+    // Check if this is a reconnection
+    let reconnectedPlayerNumber: 1 | 2 | null = null;
+    for (const [playerNum] of this.disconnectedPlayers) {
+      // Player is reconnecting - assign them their original slot
+      reconnectedPlayerNumber = playerNum;
+      console.log(`[GameRoom] Player reconnecting as P${playerNum}`);
+      
+      // Clear disconnection timeout
+      const timeout = this.disconnectionTimeouts.get(playerNum);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.disconnectionTimeouts.delete(playerNum);
+      }
+      
+      this.disconnectedPlayers.delete(playerNum);
+      break;
+    }
 
-    // Create player schema with explicit player number
-    const player = new Player(playerNumber === 1, playerNumber as 1 | 2);
+    // Determine player number (reconnection or new player)
+    const playerNumber = reconnectedPlayerNumber ?? (this.playerNumbers.size === 0 ? 1 : 2) as 1 | 2;
+    this.playerNumbers.set(client.sessionId, playerNumber);
+
+    // Create or restore player schema
+    const player = new Player(playerNumber === 1, playerNumber);
     player.sessionId = client.sessionId;
+    player.connected = true;
     this.state.players.set(client.sessionId, player);
 
     // Initialize input state
@@ -70,33 +96,95 @@ export class GameRoom extends Room<GameState> {
 
     // Check if we have both players to start the game
     if (this.playerNumbers.size === 2) {
-      this.startGame();
+      // If game was paused due to disconnection, resume it
+      if (this.state.phase === GamePhase.WAITING) {
+        this.startGame();
+      } else if (reconnectedPlayerNumber !== null) {
+        // Player reconnected during ongoing game - send them game state
+        client.send('status', { message: 'Reconnected!' });
+        console.log(`[GameRoom] Player ${playerNumber} reconnected to ongoing game`);
+      }
     } else {
       // Notify that we're waiting for another player
       client.send('status', { message: 'Waiting for opponent...' });
     }
   }
 
-  onLeave(client: Client, consented: boolean): void {
+  async onLeave(client: Client, consented: boolean): Promise<void> {
     console.log(`[GameRoom] Player ${client.sessionId} left room ${this.roomId} (consented: ${consented})`);
 
+    const playerNumber = this.playerNumbers.get(client.sessionId);
     const player = this.state.players.get(client.sessionId);
+    
     if (player) {
       player.connected = false;
     }
 
-    this.playerNumbers.delete(client.sessionId);
-    this.playerInputs.delete(client.sessionId);
+    // If player intentionally left (closed tab, clicked leave), end immediately
+    if (consented) {
+      this.cleanupDisconnectedPlayer(client.sessionId, playerNumber);
+      if (this.state.phase === GamePhase.PLAYING) {
+        this.endGame('Opponent disconnected');
+      }
+      return;
+    }
 
-    // If game was in progress and a player leaves, end the game
-    if (this.state.phase === GamePhase.PLAYING) {
-      this.endGame();
+    // Unintentional disconnect - allow reconnection
+    if (playerNumber && this.state.phase === GamePhase.PLAYING) {
+      console.log(`[GameRoom] Allowing ${RECONNECTION_TIMEOUT}s for P${playerNumber} to reconnect`);
+      
+      // Store disconnected player info
+      if (player) {
+        this.disconnectedPlayers.set(playerNumber, {
+          sessionId: client.sessionId,
+          x: player.x,
+          y: player.y
+        });
+      }
+
+      // Broadcast disconnection to remaining player
+      this.broadcast('status', { message: `Player ${playerNumber} disconnected. Waiting ${RECONNECTION_TIMEOUT}s for reconnection...` });
+
+      // Set timeout to end game if player doesn't reconnect
+      const timeout = setTimeout(() => {
+        console.log(`[GameRoom] P${playerNumber} did not reconnect in time`);
+        this.disconnectedPlayers.delete(playerNumber);
+        this.cleanupDisconnectedPlayer(client.sessionId, playerNumber);
+        this.endGame('Opponent did not reconnect');
+      }, RECONNECTION_TIMEOUT * 1000);
+
+      this.disconnectionTimeouts.set(playerNumber, timeout);
+    } else {
+      this.cleanupDisconnectedPlayer(client.sessionId, playerNumber);
+    }
+  }
+
+  /**
+   * Clean up a disconnected player's data
+   */
+  private cleanupDisconnectedPlayer(sessionId: string, playerNumber: 1 | 2 | undefined): void {
+    this.playerNumbers.delete(sessionId);
+    this.playerInputs.delete(sessionId);
+    this.state.players.delete(sessionId);
+    
+    if (playerNumber) {
+      const timeout = this.disconnectionTimeouts.get(playerNumber);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.disconnectionTimeouts.delete(playerNumber);
+      }
     }
   }
 
   onDispose(): void {
     console.log(`[GameRoom] Room ${this.roomId} disposed`);
     this.stopSimulation();
+    
+    // Clear all reconnection timeouts
+    for (const timeout of this.disconnectionTimeouts.values()) {
+      clearTimeout(timeout);
+    }
+    this.disconnectionTimeouts.clear();
   }
 
   /**

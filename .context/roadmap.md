@@ -22,5 +22,5 @@
 - [ ] Integrate Firebase v9 for Leaderboards.
 - [x] Implement Procedural Audio (Web Audio API).
 - [x] Finalize CSS CRT Overlays.
-- [ ] Configure Dockerfile for deployment.
-- [ ] Add reconnection handling for dropped connections.
+- [x] Configure Dockerfile for deployment.
+- [x] Add reconnection handling for dropped connections (30s grace period).
