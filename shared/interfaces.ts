@@ -78,3 +78,27 @@ export interface ActiveEffect {
   playerId: string;
   expiresAt: number;
 }
+
+/**
+ * Leaderboard entry for Firebase storage
+ */
+export interface LeaderboardEntry {
+  id?: string;
+  playerName: string;
+  wins: number;
+  losses: number;
+  totalGames: number;
+  winRate: number;
+  lastPlayed: number; // timestamp
+}
+
+/**
+ * Game result for leaderboard updates
+ */
+export interface GameResult {
+  winnerName: string;
+  loserName: string;
+  winnerScore: number;
+  loserScore: number;
+  timestamp: number;
+}

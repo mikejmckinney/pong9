@@ -1,5 +1,5 @@
 import { Client, Room } from 'colyseus.js';
-import { GamePhase, PlayerInput, PongMessage, PowerUpType } from '@pong9/shared/interfaces';
+import { GamePhase, PlayerInput, PongMessage, PowerUpType, RoomOptions } from '@pong9/shared/interfaces';
 
 /**
  * Callback types for network events
@@ -83,10 +83,10 @@ export class NetworkManager {
   /**
    * Connect to a game room
    */
-  async connect(): Promise<void> {
+  async connect(options: RoomOptions = {}): Promise<void> {
     try {
-      // Join or create a game room
-      this.room = await this.client.joinOrCreate('game');
+      // Join or create a game room with options
+      this.room = await this.client.joinOrCreate('game', options);
       this.sessionId = this.room.sessionId;
 
       console.log(`[NetworkManager] Connected to room: ${this.room.roomId}, sessionId: ${this.sessionId}`);

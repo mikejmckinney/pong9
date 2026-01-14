@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { NetworkManager, NetworkCallbacks } from '../network/NetworkManager.ts';
 import { COLORS } from './GameScene.ts';
+import { LeaderboardEntry } from '@pong9/shared/interfaces';
 
 /**
  * LobbyScene handles the multiplayer connection and waiting state
@@ -10,8 +11,13 @@ export class LobbyScene extends Phaser.Scene {
   private networkManager!: NetworkManager;
   private statusText!: Phaser.GameObjects.Text;
   private connectButton!: Phaser.GameObjects.Text;
+  private leaderboardButton!: Phaser.GameObjects.Text;
   private isConnecting = false;
   private latencyText!: Phaser.GameObjects.Text;
+  private playerName: string = '';
+  private nameInput!: HTMLInputElement;
+  private leaderboardContainer!: Phaser.GameObjects.Container;
+  private showingLeaderboard = false;
 
   constructor() {
     super('LobbyScene');
@@ -29,21 +35,31 @@ export class LobbyScene extends Phaser.Scene {
     bloom.blurStrength = 2;
 
     // Title
-    this.add.text(width / 2, height * 0.2, 'PONG9', {
+    this.add.text(width / 2, height * 0.15, 'PONG9', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '64px',
       color: '#04c4ca',
     }).setOrigin(0.5);
 
     // Subtitle
-    this.add.text(width / 2, height * 0.3, 'MULTIPLAYER', {
+    this.add.text(width / 2, height * 0.25, 'MULTIPLAYER', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '24px',
       color: '#ff2975',
     }).setOrigin(0.5);
 
+    // Name label
+    this.add.text(width / 2, height * 0.38, 'ENTER YOUR NAME:', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '12px',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+
+    // Create HTML input for name (Phaser doesn't have native text input)
+    this.createNameInput(width, height);
+
     // Status text
-    this.statusText = this.add.text(width / 2, height * 0.5, '', {
+    this.statusText = this.add.text(width / 2, height * 0.55, '', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '16px',
       color: '#ffffff',
@@ -69,8 +85,27 @@ export class LobbyScene extends Phaser.Scene {
     });
     this.connectButton.on('pointerdown', () => this.onConnectClick());
 
+    // Leaderboard button
+    this.leaderboardButton = this.add.text(width / 2, height * 0.78, 'LEADERBOARD', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '14px',
+      color: '#ffff00',
+      backgroundColor: '#2b2b2b',
+      padding: { x: 15, y: 8 },
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    this.leaderboardButton.on('pointerover', () => {
+      this.leaderboardButton.setColor('#ff2975');
+    });
+    this.leaderboardButton.on('pointerout', () => {
+      this.leaderboardButton.setColor('#ffff00');
+    });
+    this.leaderboardButton.on('pointerdown', () => this.toggleLeaderboard());
+
     // Instructions
-    this.add.text(width / 2, height * 0.85, 'Left side = P1 | Right side = P2', {
+    this.add.text(width / 2, height * 0.9, 'Left side = P1 | Right side = P2', {
       fontFamily: '"Press Start 2P", monospace',
       fontSize: '12px',
       color: '#666666',
@@ -83,8 +118,188 @@ export class LobbyScene extends Phaser.Scene {
       color: '#04c4ca',
     }).setOrigin(1, 0).setVisible(false);
 
+    // Create leaderboard container (hidden initially)
+    this.createLeaderboardContainer(width, height);
+
     // Initialize network manager
     this.initNetworkManager();
+
+    // Clean up input on scene shutdown
+    this.events.on('shutdown', () => {
+      if (this.nameInput && this.nameInput.parentNode) {
+        this.nameInput.parentNode.removeChild(this.nameInput);
+      }
+    });
+  }
+
+  private createNameInput(_width: number, height: number): void {
+    // Create and style the HTML input element
+    this.nameInput = document.createElement('input');
+    this.nameInput.type = 'text';
+    this.nameInput.placeholder = 'Anonymous';
+    this.nameInput.maxLength = 12;
+    this.nameInput.style.cssText = `
+      position: absolute;
+      left: 50%;
+      top: ${height * 0.44}px;
+      transform: translateX(-50%);
+      width: 200px;
+      padding: 10px;
+      font-family: "Press Start 2P", monospace;
+      font-size: 14px;
+      text-align: center;
+      background-color: #2b2b2b;
+      color: #04c4ca;
+      border: 2px solid #04c4ca;
+      border-radius: 4px;
+      outline: none;
+    `;
+    
+    this.nameInput.addEventListener('input', () => {
+      this.playerName = this.nameInput.value.trim() || 'Anonymous';
+    });
+
+    // Add to DOM
+    const canvas = this.game.canvas;
+    const parent = canvas.parentElement;
+    if (parent) {
+      parent.style.position = 'relative';
+      parent.appendChild(this.nameInput);
+    }
+  }
+
+  private createLeaderboardContainer(width: number, height: number): void {
+    this.leaderboardContainer = this.add.container(width / 2, height / 2);
+    this.leaderboardContainer.setVisible(false);
+
+    // Background panel
+    const panel = this.add.rectangle(0, 0, 500, 400, 0x1b2853, 0.95);
+    panel.setStrokeStyle(2, 0x04c4ca);
+    this.leaderboardContainer.add(panel);
+
+    // Title
+    const title = this.add.text(0, -170, 'LEADERBOARD', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '24px',
+      color: '#ffff00',
+    }).setOrigin(0.5);
+    this.leaderboardContainer.add(title);
+
+    // Close button
+    const closeBtn = this.add.text(220, -170, 'X', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '20px',
+      color: '#ff2975',
+    })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+    
+    closeBtn.on('pointerdown', () => this.toggleLeaderboard());
+    this.leaderboardContainer.add(closeBtn);
+
+    // Loading text (will be replaced with leaderboard data)
+    const loadingText = this.add.text(0, 0, 'Loading...', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '14px',
+      color: '#ffffff',
+    }).setOrigin(0.5);
+    loadingText.setName('loadingText');
+    this.leaderboardContainer.add(loadingText);
+  }
+
+  private async toggleLeaderboard(): Promise<void> {
+    this.showingLeaderboard = !this.showingLeaderboard;
+    this.leaderboardContainer.setVisible(this.showingLeaderboard);
+    
+    if (this.showingLeaderboard) {
+      // Hide name input when showing leaderboard
+      if (this.nameInput) {
+        this.nameInput.style.display = 'none';
+      }
+      await this.fetchLeaderboard();
+    } else {
+      // Show name input when hiding leaderboard
+      if (this.nameInput) {
+        this.nameInput.style.display = 'block';
+      }
+    }
+  }
+
+  private async fetchLeaderboard(): Promise<void> {
+    try {
+      const serverUrl = this.getServerUrl().replace('ws://', 'http://').replace('wss://', 'https://');
+      const response = await fetch(`${serverUrl}/api/leaderboard`);
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        this.displayLeaderboard(data.data);
+      } else {
+        this.displayLeaderboardError('No data available');
+      }
+    } catch (error) {
+      this.displayLeaderboardError('Could not load leaderboard');
+    }
+  }
+
+  private displayLeaderboard(entries: LeaderboardEntry[]): void {
+    // Remove existing entries
+    const existingEntries = this.leaderboardContainer.getAll().filter(
+      child => child.name?.startsWith('entry_') || child.name === 'loadingText'
+    );
+    existingEntries.forEach(entry => entry.destroy());
+
+    if (entries.length === 0) {
+      const noData = this.add.text(0, 0, 'No games played yet!', {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '14px',
+        color: '#666666',
+      }).setOrigin(0.5);
+      noData.setName('entry_nodata');
+      this.leaderboardContainer.add(noData);
+      return;
+    }
+
+    // Header
+    const header = this.add.text(-200, -120, 'RANK  NAME         WINS  RATE', {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '10px',
+      color: '#04c4ca',
+    });
+    header.setName('entry_header');
+    this.leaderboardContainer.add(header);
+
+    // Display entries
+    entries.slice(0, 8).forEach((entry, index) => {
+      const rank = (index + 1).toString().padStart(2, ' ');
+      const name = (entry.playerName || 'Anonymous').substring(0, 10).padEnd(10, ' ');
+      const wins = entry.wins.toString().padStart(4, ' ');
+      const rate = `${entry.winRate}%`.padStart(5, ' ');
+      
+      const color = index === 0 ? '#ffff00' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : '#ffffff';
+      
+      const entryText = this.add.text(-200, -90 + index * 30, `${rank}.  ${name}  ${wins}  ${rate}`, {
+        fontFamily: '"Press Start 2P", monospace',
+        fontSize: '12px',
+        color,
+      });
+      entryText.setName(`entry_${index}`);
+      this.leaderboardContainer.add(entryText);
+    });
+  }
+
+  private displayLeaderboardError(message: string): void {
+    const existingEntries = this.leaderboardContainer.getAll().filter(
+      child => child.name?.startsWith('entry_') || child.name === 'loadingText'
+    );
+    existingEntries.forEach(entry => entry.destroy());
+
+    const errorText = this.add.text(0, 0, message, {
+      fontFamily: '"Press Start 2P", monospace',
+      fontSize: '12px',
+      color: '#ff2975',
+    }).setOrigin(0.5);
+    errorText.setName('entry_error');
+    this.leaderboardContainer.add(errorText);
   }
 
   private initNetworkManager(): void {
@@ -101,6 +316,10 @@ export class LobbyScene extends Phaser.Scene {
       onWaiting: () => {
         this.statusText.setText('WAITING FOR OPPONENT...');
         this.connectButton.setVisible(false);
+        this.leaderboardButton.setVisible(false);
+        if (this.nameInput) {
+          this.nameInput.style.display = 'none';
+        }
         // Add pulsing animation
         this.tweens.add({
           targets: this.statusText,
@@ -124,6 +343,10 @@ export class LobbyScene extends Phaser.Scene {
         this.statusText.setText(`GAME ENDED: ${reason}`);
         this.connectButton.setVisible(true);
         this.connectButton.setText('TAP TO RECONNECT');
+        this.leaderboardButton.setVisible(true);
+        if (this.nameInput) {
+          this.nameInput.style.display = 'block';
+        }
         this.isConnecting = false;
       },
       onPong: (latency) => {
@@ -134,6 +357,10 @@ export class LobbyScene extends Phaser.Scene {
         this.statusText.setColor('#ff0000');
         this.connectButton.setVisible(true);
         this.connectButton.setText('TAP TO RETRY');
+        this.leaderboardButton.setVisible(true);
+        if (this.nameInput) {
+          this.nameInput.style.display = 'block';
+        }
         this.isConnecting = false;
       },
     };
@@ -188,8 +415,11 @@ export class LobbyScene extends Phaser.Scene {
     this.statusText.setText('CONNECTING...');
     this.connectButton.setVisible(false);
 
+    // Get player name from input
+    const name = this.playerName || this.nameInput?.value?.trim() || 'Anonymous';
+
     try {
-      await this.networkManager.connect();
+      await this.networkManager.connect({ playerName: name });
     } catch {
       // Error handling is done in callbacks
     }

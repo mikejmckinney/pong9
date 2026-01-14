@@ -1,6 +1,7 @@
 import { Room, Client } from 'colyseus';
 import { GameState, Player, PowerUp, ActiveEffect } from '../schemas/index.js';
-import { PlayerInput, GamePhase, PingMessage, PongMessage, PowerUpType } from '@pong9/shared/interfaces';
+import { PlayerInput, GamePhase, PingMessage, PongMessage, PowerUpType, RoomOptions, GameResult } from '@pong9/shared/interfaces';
+import { leaderboardService } from '../services/LeaderboardService.js';
 import { 
   PADDLE_SPEED, 
   SERVER_TICK_RATE, 
@@ -60,8 +61,9 @@ export class GameRoom extends Room<GameState> {
     console.log(`[GameRoom] Room ${this.roomId} created`);
   }
 
-  onJoin(client: Client): void {
-    console.log(`[GameRoom] Player ${client.sessionId} joined room ${this.roomId}`);
+  onJoin(client: Client, options: RoomOptions): void {
+    const playerName = options.playerName || `Player${this.playerNumbers.size + 1}`;
+    console.log(`[GameRoom] Player ${playerName} (${client.sessionId}) joined room ${this.roomId}`);
 
     // Check if this is a reconnection
     let reconnectedPlayerNumber: 1 | 2 | null = null;
@@ -85,8 +87,8 @@ export class GameRoom extends Room<GameState> {
     const playerNumber = reconnectedPlayerNumber ?? (this.playerNumbers.size === 0 ? 1 : 2) as 1 | 2;
     this.playerNumbers.set(client.sessionId, playerNumber);
 
-    // Create or restore player schema
-    const player = new Player(playerNumber === 1, playerNumber);
+    // Create or restore player schema with name
+    const player = new Player(playerNumber === 1, playerNumber, playerName);
     player.sessionId = client.sessionId;
     player.connected = true;
     this.state.players.set(client.sessionId, player);
@@ -503,12 +505,44 @@ export class GameRoom extends Room<GameState> {
   /**
    * End the game (player disconnection, winner, or other reason)
    */
-  private endGame(reason: string = 'Player disconnected'): void {
+  private async endGame(reason: string = 'Player disconnected'): Promise<void> {
     console.log(`[GameRoom] Ending game in room ${this.roomId}: ${reason}`);
     this.state.phase = GamePhase.FINISHED;
     this.stopSimulation();
     this.stopPowerUpSpawning();
     this.broadcast('gameEnd', { reason });
+
+    // Record game result to leaderboard if there's a winner
+    if (this.state.winner > 0) {
+      await this.recordGameToLeaderboard();
+    }
+  }
+
+  /**
+   * Record game result to Firebase leaderboard
+   */
+  private async recordGameToLeaderboard(): Promise<void> {
+    // Find winner and loser players
+    let winnerName = 'Player1';
+    let loserName = 'Player2';
+
+    for (const player of this.state.players.values()) {
+      if (player.playerNumber === this.state.winner) {
+        winnerName = player.name;
+      } else {
+        loserName = player.name;
+      }
+    }
+
+    const result: GameResult = {
+      winnerName,
+      loserName,
+      winnerScore: this.state.winner === 1 ? this.state.score1 : this.state.score2,
+      loserScore: this.state.winner === 1 ? this.state.score2 : this.state.score1,
+      timestamp: Date.now()
+    };
+
+    await leaderboardService.recordGameResult(result);
   }
 
   /**

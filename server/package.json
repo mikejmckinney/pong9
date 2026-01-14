@@ -10,13 +10,14 @@
     "dev": "npx tsx watch src/main.ts"
   },
   "dependencies": {
-    "colyseus": "^0.16.5",
     "@colyseus/schema": "^3.0.76",
-    "@pong9/shared": "1.0.0"
+    "@pong9/shared": "1.0.0",
+    "colyseus": "^0.16.5",
+    "firebase": "^10.14.1"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
+    "@types/node": "^20.10.6",
     "tsx": "^4.7.0",
-    "@types/node": "^20.10.6"
+    "typescript": "^5.3.3"
   }
 }

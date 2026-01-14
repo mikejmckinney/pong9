@@ -2,19 +2,20 @@
 *Last Updated: 2026-01-14*
 
 ## 📍 Current Status
-**Phase:** Phase 4 — Polish & Persistence 🔄 **IN PROGRESS**
-**Active Task:** Docker deployment and reconnection handling implemented. Next: Firebase leaderboards.
+**Phase:** Phase 4 — Polish & Persistence ✅ **COMPLETE**
+**Active Task:** All Phase 4 tasks completed. Firebase leaderboard integration finished.
 
 ## 📋 Context & Decisions
-* Phase 4 implementation in progress
-* Power-up system fully implemented on server and client
+* Phase 4 fully completed
+* Power-up system implemented on server and client
 * Four power-up types: BIG_PADDLE, SHRINK_OPPONENT, SPEED_UP, SLOW_DOWN
-* Power-ups spawn every 10 seconds with 50% chance when no active power-up exists
-* Effects last 5 seconds then revert to normal
-* Server handles all power-up logic (spawning, collision, effects)
-* Client renders power-ups with synthwave-styled glowing animation
 * Docker deployment configured with multi-stage Dockerfile
-* Reconnection handling allows 30 seconds for players to reconnect after disconnection
+* Reconnection handling allows 30 seconds for players to reconnect
+* Firebase v9 leaderboard integration complete with:
+  - Player name input on lobby screen
+  - Game results recorded to Firebase after each match
+  - Leaderboard display showing top players by wins
+  - REST API endpoints for fetching leaderboard data
 
 ## ✅ Completed Tasks
 1. ✅ Phase 1: Setup Phaser 3 + TypeScript + Vite environment
@@ -48,6 +49,10 @@
 29. ✅ Phase 4: Configure Dockerfile for deployment
 30. ✅ Phase 4: Add docker-compose.yml for easy local deployment
 31. ✅ Phase 4: Add reconnection handling (30s grace period)
+32. ✅ Phase 4: Integrate Firebase v9 for Leaderboards
+33. ✅ Phase 4: Add player name input to lobby
+34. ✅ Phase 4: Add leaderboard display in lobby
+35. ✅ Phase 4: Add REST API endpoints for leaderboard
 
 ## ⏭️ Next Steps
-1. Integrate Firebase v9 for Leaderboards
+All phases completed! Project ready for deployment and testing.
