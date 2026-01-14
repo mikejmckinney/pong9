@@ -623,8 +623,12 @@ export class GameScene extends Phaser.Scene {
     ballSprite.x = Phaser.Math.Linear(ballSprite.x, extrapolatedX, this.INTERPOLATION_SPEED);
     ballSprite.y = Phaser.Math.Linear(ballSprite.y, extrapolatedY, this.INTERPOLATION_SPEED);
 
-    // Update touch input
-    this.touchInput.update();
+    // NOTE: Do NOT call this.touchInput.update() in networked mode!
+    // Fix for: "Avoid moving paddles via touch input in netplay"
+    // https://github.com/PR#comment - chatgpt-codex-connector suggestion
+    // Touch input is already processed via getCurrentInput() for the local paddle only.
+    // Calling touchInput.update() would incorrectly move BOTH paddles locally,
+    // fighting against server-authoritative state and causing jitter.
   }
 
   /**

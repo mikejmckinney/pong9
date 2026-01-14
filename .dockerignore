@@ -8,10 +8,18 @@ node_modules/
 # Build outputs (will be rebuilt in container)
 dist/
 **/dist/
-*.js
+
+# Compiled JS/TS outputs - be specific to avoid excluding config files
+# Fix for: "*.js exclusion too broad" - @gemini-code-assist suggestion
+# https://github.com/PR#comment
+# Only exclude .js/.d.ts in source directories, not root config files
+client/src/**/*.js
+server/src/**/*.js
+shared/*.js
 *.js.map
-*.d.ts
-!vite.config.ts
+client/src/**/*.d.ts
+server/src/**/*.d.ts
+shared/*.d.ts
 
 # Git
 .git/

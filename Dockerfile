@@ -37,9 +37,11 @@ COPY server/package.json ./server/
 RUN npm install --omit=dev --workspace=server --workspace=shared
 
 # Copy built artifacts from builder stage
+# Fix for: "Redundant COPY commands" - @gemini-code-assist suggestion
+# https://github.com/PR#comment
+# All compiled output is in dist/ directories per tsconfig.json settings
 COPY --from=builder /app/shared/dist ./shared/dist
-COPY --from=builder /app/shared/*.js ./shared/
-COPY --from=builder /app/shared/*.d.ts ./shared/
+COPY --from=builder /app/shared/package.json ./shared/
 COPY --from=builder /app/server/dist ./server/dist
 COPY --from=builder /app/client/dist ./client/dist
 

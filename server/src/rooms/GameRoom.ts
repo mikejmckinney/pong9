@@ -102,9 +102,11 @@ export class GameRoom extends Room<GameState> {
       if (this.state.phase === GamePhase.WAITING) {
         this.startGame();
       } else if (reconnectedPlayerNumber !== null) {
-        // Player reconnected during ongoing game - send them game state
+        // Player reconnected during ongoing game - resume simulation
         client.send('status', { message: 'Reconnected!' });
         console.log(`[GameRoom] Player ${playerNumber} reconnected to ongoing game`);
+        // Resume the paused simulation
+        this.resumeFromReconnection();
       }
     } else {
       // Notify that we're waiting for another player
@@ -143,6 +145,11 @@ export class GameRoom extends Room<GameState> {
           y: player.y
         });
       }
+
+      // PAUSE SIMULATION during reconnection grace period
+      // Fix for: "Pause simulation during reconnection grace period"
+      // https://github.com/PR#comment - chatgpt-codex-connector suggestion
+      this.pauseForReconnection();
 
       // Broadcast disconnection to remaining player
       this.broadcast('status', { message: `Player ${playerNumber} disconnected. Waiting ${RECONNECTION_TIMEOUT}s for reconnection...` });
@@ -553,6 +560,46 @@ export class GameRoom extends Room<GameState> {
       clearTimeout(this.simulationInterval);
       this.simulationInterval = null;
     }
+  }
+
+  /**
+   * Pause simulation during reconnection grace period
+   * Freezes ball and notifies remaining player
+   * Fix for: https://github.com/PR#comment - "Pause simulation during reconnection grace period"
+   */
+  private pauseForReconnection(): void {
+    // Stop the simulation loop
+    this.stopSimulation();
+    
+    // Freeze the ball by zeroing velocity
+    this.state.ballVelX = 0;
+    this.state.ballVelY = 0;
+    
+    // Stop power-up spawning during pause
+    this.stopPowerUpSpawning();
+    
+    console.log('[GameRoom] Game paused for reconnection');
+  }
+
+  /**
+   * Resume simulation after player reconnects
+   */
+  private resumeFromReconnection(): void {
+    if (this.state.phase !== GamePhase.PLAYING) return;
+    
+    console.log('[GameRoom] Resuming game after reconnection');
+    
+    // Restart simulation loop
+    this.lastTickTime = Date.now();
+    this.accumulatedDrift = 0;
+    this.scheduleNextTick();
+    
+    // Restart power-up spawning
+    this.startPowerUpSpawning();
+    
+    // Re-launch ball after a short delay
+    this.broadcast('status', { message: 'Player reconnected! Resuming...' });
+    setTimeout(() => this.launchBall(), 1500);
   }
 
   // ==================== Power-Up System (Phase 4) ====================

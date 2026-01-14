@@ -4,6 +4,25 @@ import { COLORS } from './GameScene.ts';
 import { LeaderboardEntry } from '@pong9/shared/interfaces';
 
 /**
+ * Display constants for leaderboard
+ * Fix for: "Add MAX_PLAYER_NAME_DISPLAY_LENGTH constant" - @gemini-code-assist suggestion
+ * https://github.com/PR#comment
+ */
+const MAX_PLAYER_NAME_DISPLAY_LENGTH = 10;
+
+/**
+ * Leaderboard rank colors (gold, silver, bronze)
+ * Fix for: "Add leaderboard rank colors as constants" - @gemini-code-assist suggestion
+ * https://github.com/PR#comment
+ */
+const LEADERBOARD_COLORS = {
+  RANK_1: '#ffff00', // Gold
+  RANK_2: '#c0c0c0', // Silver
+  RANK_3: '#cd7f32', // Bronze
+  DEFAULT: '#ffffff', // White for other ranks
+};
+
+/**
  * LobbyScene handles the multiplayer connection and waiting state
  * Transitions to GameScene once both players are connected
  */
@@ -132,12 +151,48 @@ export class LobbyScene extends Phaser.Scene {
     });
   }
 
+  /**
+   * Create name input element with responsive positioning
+   * Fix for: "Input positioning scaling" - @Copilot review suggestion
+   * https://github.com/PR#comment
+   * Uses percentage-based positioning and handles canvas resize
+   */
   private createNameInput(_width: number, height: number): void {
     // Create and style the HTML input element
     this.nameInput = document.createElement('input');
     this.nameInput.type = 'text';
     this.nameInput.placeholder = 'Anonymous';
     this.nameInput.maxLength = 12;
+    
+    // Apply initial positioning
+    this.updateInputPosition(height);
+    
+    this.nameInput.addEventListener('input', () => {
+      this.playerName = this.nameInput.value.trim() || 'Anonymous';
+    });
+
+    // Add to DOM
+    const canvas = this.game.canvas;
+    const parent = canvas.parentElement;
+    if (parent) {
+      parent.style.position = 'relative';
+      parent.appendChild(this.nameInput);
+    }
+
+    // Handle canvas resize to reposition input
+    this.scale.on('resize', (_gameSize: Phaser.Structs.Size) => {
+      if (this.nameInput) {
+        this.updateInputPosition(this.scale.height);
+      }
+    });
+  }
+
+  /**
+   * Update input element position based on canvas size
+   */
+  private updateInputPosition(height: number): void {
+    if (!this.nameInput) return;
+    
     this.nameInput.style.cssText = `
       position: absolute;
       left: 50%;
@@ -154,18 +209,6 @@ export class LobbyScene extends Phaser.Scene {
       border-radius: 4px;
       outline: none;
     `;
-    
-    this.nameInput.addEventListener('input', () => {
-      this.playerName = this.nameInput.value.trim() || 'Anonymous';
-    });
-
-    // Add to DOM
-    const canvas = this.game.canvas;
-    const parent = canvas.parentElement;
-    if (parent) {
-      parent.style.position = 'relative';
-      parent.appendChild(this.nameInput);
-    }
   }
 
   private createLeaderboardContainer(width: number, height: number): void {
@@ -271,11 +314,17 @@ export class LobbyScene extends Phaser.Scene {
     // Display entries
     entries.slice(0, 8).forEach((entry, index) => {
       const rank = (index + 1).toString().padStart(2, ' ');
-      const name = (entry.playerName || 'Anonymous').substring(0, 10).padEnd(10, ' ');
+      const name = (entry.playerName || 'Anonymous')
+        .substring(0, MAX_PLAYER_NAME_DISPLAY_LENGTH)
+        .padEnd(MAX_PLAYER_NAME_DISPLAY_LENGTH, ' ');
       const wins = entry.wins.toString().padStart(4, ' ');
       const rate = `${entry.winRate}%`.padStart(5, ' ');
       
-      const color = index === 0 ? '#ffff00' : index === 1 ? '#c0c0c0' : index === 2 ? '#cd7f32' : '#ffffff';
+      // Use rank-based colors from constants
+      const color = index === 0 ? LEADERBOARD_COLORS.RANK_1 
+                  : index === 1 ? LEADERBOARD_COLORS.RANK_2 
+                  : index === 2 ? LEADERBOARD_COLORS.RANK_3 
+                  : LEADERBOARD_COLORS.DEFAULT;
       
       const entryText = this.add.text(-200, -90 + index * 30, `${rank}.  ${name}  ${wins}  ${rate}`, {
         fontFamily: '"Press Start 2P", monospace',

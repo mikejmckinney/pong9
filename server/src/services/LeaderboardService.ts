@@ -19,6 +19,8 @@ import {
 import { LeaderboardEntry, GameResult } from '@pong9/shared/interfaces';
 
 // Firebase configuration from environment variables
+// Fix for: "Firebase credentials validation" - @Copilot review suggestion
+// https://github.com/PR#comment - Validate required config before use
 const firebaseConfig = {
   apiKey: process.env.FIREBASE_API_KEY || '',
   authDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
@@ -27,6 +29,35 @@ const firebaseConfig = {
   messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || '',
   appId: process.env.FIREBASE_APP_ID || ''
 };
+
+/**
+ * Sanitize player name for use as Firestore document ID
+ * Firestore document IDs cannot contain: / . # $ [ ] or be empty
+ * Fix for: "Player name sanitization" - @Copilot review suggestion
+ * https://github.com/PR#comment
+ */
+function sanitizePlayerName(name: string): string {
+  // Remove invalid Firestore document ID characters
+  let sanitized = name
+    .toLowerCase()
+    .trim()
+    .replace(/[\/\.#$\[\]]/g, '_') // Replace invalid chars with underscore
+    .replace(/\s+/g, '_')          // Replace whitespace with underscore
+    .replace(/_+/g, '_')           // Collapse multiple underscores
+    .replace(/^_|_$/g, '');        // Remove leading/trailing underscores
+  
+  // Ensure non-empty (use 'anonymous' as fallback)
+  if (!sanitized || sanitized.length === 0) {
+    sanitized = 'anonymous';
+  }
+  
+  // Firestore document IDs max length is 1500 bytes, but we limit to 50 for sanity
+  if (sanitized.length > 50) {
+    sanitized = sanitized.substring(0, 50);
+  }
+  
+  return sanitized;
+}
 
 export class LeaderboardService {
   private app: FirebaseApp | null = null;
@@ -37,13 +68,19 @@ export class LeaderboardService {
   /**
    * Initialize Firebase connection
    * Returns false if Firebase config is not set (allows running without Firebase)
+   * Fix for: "Firebase credentials validation" - @Copilot review suggestion
    */
   async initialize(): Promise<boolean> {
-    // Check if Firebase is configured
+    // Check if Firebase is configured - projectId is required
     if (!firebaseConfig.projectId) {
       console.log('[LeaderboardService] Firebase not configured - leaderboard disabled');
       console.log('[LeaderboardService] Set FIREBASE_PROJECT_ID environment variable to enable');
       return false;
+    }
+
+    // Warn about missing optional credentials that might cause issues
+    if (!firebaseConfig.apiKey) {
+      console.warn('[LeaderboardService] Warning: FIREBASE_API_KEY not set - some features may not work');
     }
 
     try {
@@ -54,6 +91,10 @@ export class LeaderboardService {
       return true;
     } catch (error) {
       console.error('[LeaderboardService] Failed to initialize Firebase:', error);
+      // Provide helpful guidance for common errors
+      if (error instanceof Error && error.message.includes('projectId')) {
+        console.error('[LeaderboardService] Hint: Ensure FIREBASE_PROJECT_ID matches your Firebase project');
+      }
       return false;
     }
   }
@@ -67,12 +108,14 @@ export class LeaderboardService {
 
   /**
    * Get or create a player entry by name
+   * Uses sanitized name as document ID to prevent Firestore errors
    */
   async getPlayerEntry(playerName: string): Promise<LeaderboardEntry | null> {
     if (!this.isReady() || !this.db) return null;
 
     try {
-      const docRef = doc(this.db, this.COLLECTION_NAME, playerName.toLowerCase());
+      const sanitizedId = sanitizePlayerName(playerName);
+      const docRef = doc(this.db, this.COLLECTION_NAME, sanitizedId);
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
@@ -90,7 +133,7 @@ export class LeaderboardService {
       };
 
       await setDoc(docRef, newEntry);
-      return { id: playerName.toLowerCase(), ...newEntry };
+      return { id: sanitizedId, ...newEntry };
     } catch (error) {
       console.error('[LeaderboardService] Error getting player entry:', error);
       return null;
@@ -107,8 +150,9 @@ export class LeaderboardService {
     }
 
     try {
-      // Update winner stats
-      const winnerRef = doc(this.db, this.COLLECTION_NAME, result.winnerName.toLowerCase());
+      // Update winner stats - use sanitized names for document IDs
+      const winnerId = sanitizePlayerName(result.winnerName);
+      const winnerRef = doc(this.db, this.COLLECTION_NAME, winnerId);
       const winnerSnap = await getDoc(winnerRef);
 
       if (winnerSnap.exists()) {
@@ -132,8 +176,9 @@ export class LeaderboardService {
         });
       }
 
-      // Update loser stats
-      const loserRef = doc(this.db, this.COLLECTION_NAME, result.loserName.toLowerCase());
+      // Update loser stats - use sanitized names for document IDs
+      const loserId = sanitizePlayerName(result.loserName);
+      const loserRef = doc(this.db, this.COLLECTION_NAME, loserId);
       const loserSnap = await getDoc(loserRef);
 
       if (loserSnap.exists()) {
