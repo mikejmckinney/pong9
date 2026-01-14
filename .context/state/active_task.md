@@ -21,4 +21,4 @@
    - Sync ball velocity in state for better client interpolation/prediction
    - Add stronger client-side prediction + reconciliation for paddle inputs (snapshot-based)
 2. Add minimal regression tests for server simulation once headless harness is ready.
-3. Expand docs (AI_REPO_GUIDE/README) with online play notes and endpoint override reminders.
+3. Validate two-client online sessions to confirm server-authoritative ball/paddle sync remains stable across peers.

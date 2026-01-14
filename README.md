@@ -96,7 +96,7 @@ cd client && npm run build
 - ✅ **Responsive Scaling** - Phaser.Scale.FIT for any screen size
 
 **Phases 2-4 - Planned/In Progress:**
-- **Multiplayer Networking (in progress)** - Authoritative server with paddle/ball simulation; client-side prediction/reconciliation still to come
+- **Multiplayer Networking (in progress → Phase 3)** - Authoritative server with paddle/ball simulation; client-side prediction/reconciliation planned for Phase 3
 - **Leaderboard** - Firebase v9 integration
 - **Procedural Audio** - Web Audio API sounds
 
