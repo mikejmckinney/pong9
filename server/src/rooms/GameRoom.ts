@@ -499,7 +499,11 @@ export class GameRoom extends Room<GameState> {
 
       if (dx < halfBall + halfPowerUp && dy < halfBall + halfPowerUp) {
         // Determine which player gets the power-up based on ball direction
-        const playerId = this.state.ballVelX > 0 ? this.getPlayerByNumber(1)?.sessionId : this.getPlayerByNumber(2)?.sessionId;
+        // Ball moving right (velX > 0) = heading toward P2, so P2 gets the power-up
+        // Ball moving left (velX < 0) = heading toward P1, so P1 gets the power-up
+        const playerId = this.state.ballVelX > 0 
+          ? this.getPlayerByNumber(2)?.sessionId 
+          : this.getPlayerByNumber(1)?.sessionId;
         
         if (playerId) {
           this.applyPowerUp(powerUp.powerUpType as PowerUpType, playerId);
@@ -529,41 +533,52 @@ export class GameRoom extends Room<GameState> {
     const player = this.state.players.get(playerId);
     if (!player) return;
 
-    // Create active effect
-    const effect = new ActiveEffect(type, playerId, POWERUP_DURATION);
-    this.state.activeEffects.push(effect);
-
     // Apply immediate effect
     switch (type) {
-      case PowerUpType.BIG_PADDLE:
+      case PowerUpType.BIG_PADDLE: {
+        // Create active effect for the collector
+        const effect = new ActiveEffect(type, playerId, POWERUP_DURATION);
+        this.state.activeEffects.push(effect);
         player.paddleScale = PADDLE_SIZE_MULTIPLIER;
         console.log(`[GameRoom] Player ${player.playerNumber} paddle enlarged!`);
         break;
+      }
 
-      case PowerUpType.SHRINK_OPPONENT:
-        // Find opponent
+      case PowerUpType.SHRINK_OPPONENT: {
+        // Find opponent and apply effect to them (not the collector)
         const opponentNum = player.playerNumber === 1 ? 2 : 1;
         const opponent = this.getPlayerByNumber(opponentNum);
         if (opponent) {
           opponent.paddleScale = 1 / PADDLE_SIZE_MULTIPLIER;
-          // Create effect for opponent
+          // Create effect for opponent only
           const opponentEffect = new ActiveEffect(type, opponent.sessionId, POWERUP_DURATION);
           this.state.activeEffects.push(opponentEffect);
           console.log(`[GameRoom] Player ${opponent.playerNumber} paddle shrunk!`);
         }
         break;
+      }
 
-      case PowerUpType.SPEED_UP:
+      case PowerUpType.SPEED_UP: {
+        // Only allow one speed effect at a time - reset any existing speed modifiers
         this.ballSpeedModifier = BALL_SPEED_MULTIPLIER;
         this.applyBallSpeedModifier();
+        // Create effect (use collector's ID to track expiration)
+        const effect = new ActiveEffect(type, playerId, POWERUP_DURATION);
+        this.state.activeEffects.push(effect);
         console.log(`[GameRoom] Ball speed increased!`);
         break;
+      }
 
-      case PowerUpType.SLOW_DOWN:
+      case PowerUpType.SLOW_DOWN: {
+        // Only allow one speed effect at a time - reset any existing speed modifiers
         this.ballSpeedModifier = SLOW_BALL_MULTIPLIER;
         this.applyBallSpeedModifier();
+        // Create effect (use collector's ID to track expiration)
+        const effect = new ActiveEffect(type, playerId, POWERUP_DURATION);
+        this.state.activeEffects.push(effect);
         console.log(`[GameRoom] Ball speed decreased!`);
         break;
+      }
     }
   }
 
