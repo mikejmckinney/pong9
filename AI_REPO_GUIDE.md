@@ -4,7 +4,7 @@
 
 This is a mobile-first multiplayer Pong game with a Retro Synthwave aesthetic, built with Phaser 3 (client) and Node.js/Colyseus (server). The repository provides AI agent configurations, onboarding prompts, and structural conventions to facilitate rapid development.
 
-**Current Status:** Phase 1 - The Core Loop (Local Prototype) implementation complete. Phase 2 networking scaffolding is in progress with a Colyseus server, shared schemas, and a client connection status overlay. The client-side game remains fully playable locally with Phaser 3, synthwave visuals, physics, and mobile touch controls.
+**Current Status:** Phase 1 - The Core Loop (Local Prototype) implementation complete. Phase 2 networking is wrapping up with a Colyseus server, shared schemas, and server-authoritative paddle + ball simulation (scoring, serve timing). The client connects automatically, mirrors paddle/ball/score from the server with ping/pong health checks, and falls back to local play when offline or waiting for a peer.
 
 ## Tech Stack
 
@@ -56,8 +56,8 @@ This is a mobile-first multiplayer Pong game with a Retro Synthwave aesthetic, b
 │   ├── package.json     # Client dependencies
 │   ├── tsconfig.json    # TypeScript configuration
 │   └── vite.config.ts   # Vite build configuration
-├── server/               # Node.js + Colyseus backend (planned)
-├── shared/               # Shared TypeScript interfaces (planned)
+├── server/               # Node.js + Colyseus backend (Phase 2 networking, authoritative paddle/ball simulation)
+├── shared/               # Shared TypeScript interfaces (network state, constants, schemas)
 ├── AGENTS.md             # Canonical agent documentation (primary reference)
 ├── AGENT.md              # Deprecated, redirects to AGENTS.md
 ├── install.sh            # Codespace setup script (VS Code extensions + prompts)
@@ -72,11 +72,14 @@ This is a mobile-first multiplayer Pong game with a Retro Synthwave aesthetic, b
 - **Game Scene:** `/client/src/scenes/GameScene.ts` - Main gameplay scene with visuals and physics
 - **HTML Entry:** `/client/index.html` - Mobile-optimized HTML with landscape enforcement
 
-**Server (Planned):**
-- Will be in `/server` directory (Colyseus server initialization)
+**Server (Phase 2 - Networking):**
+- **Server Entry:** `/server/src/index.ts` - Colyseus server bootstrap (WS transport, room registration)
+- **Room Logic:** `/server/src/rooms/PongRoom.ts` - Authoritative paddle/ball simulation, scoring, serve timing
 
-**Shared (Planned):**
-- Will be in `/shared` directory (TypeScript interfaces)
+**Shared (Network Types):**
+- **State Schemas:** `/shared/GameState.ts` - Colyseus schemas for players/ball/game phase
+- **Constants:** `/shared/constants.ts` - Shared dimensions, speeds, serve angles
+- **Messages/Utils:** `/shared/messages.ts`, `/shared/playerUtils.ts`
 
 ## Configuration Files
 
@@ -316,7 +319,7 @@ From `.context/roadmap.md`:
 
 2. **copilot-instructions.md is configured** - This repo uses repository-specific Copilot instructions in `.github/copilot-instructions.md`. If those instructions become stale after major workflow or structure changes, refresh them using `.github/prompts/copilot-onboarding.md` once this guide is up to date.
 
-3. **No actual codebase yet** - This is a template repository with instructions but no game implementation.
+3. **Colyseus endpoint** - Online play requires a running Colyseus server (defaults to `ws://<host>:2567`). Override with `VITE_COLYSEUS_ENDPOINT` when targeting a remote server; client falls back to local play if unreachable.
 
 4. **test.sh expects specific files** - Adding/removing template files requires updating the test script.
 
@@ -388,6 +391,6 @@ From `.context/roadmap.md`:
 
 ---
 
-**Last Updated:** 2026-01-13
+**Last Updated:** 2026-01-14
 **Maintained By:** AI agents and human developers
 **Update Frequency:** Any PR that changes commands, structure, conventions, or troubleshooting should update this file
