@@ -48,3 +48,57 @@ export interface PongMessage {
   clientTime: number;
   serverTime: number;
 }
+
+/**
+ * Power-up types (Phase 4)
+ */
+export enum PowerUpType {
+  BIG_PADDLE = 'big_paddle',     // Increases paddle size for collector
+  SPEED_UP = 'speed_up',         // Speeds up the ball
+  SLOW_DOWN = 'slow_down',       // Slows down the ball
+  SHRINK_OPPONENT = 'shrink_opponent', // Shrinks opponent's paddle
+}
+
+/**
+ * Power-up state for synchronization
+ */
+export interface PowerUpState {
+  id: string;
+  type: PowerUpType;
+  x: number;
+  y: number;
+  active: boolean;
+}
+
+/**
+ * Active power-up effect on a player
+ */
+export interface ActiveEffect {
+  type: PowerUpType;
+  playerId: string;
+  expiresAt: number;
+}
+
+/**
+ * Leaderboard entry for Firebase storage
+ */
+export interface LeaderboardEntry {
+  id?: string;
+  playerName: string;
+  wins: number;
+  losses: number;
+  totalGames: number;
+  winRate: number;
+  lastPlayed: number; // timestamp
+}
+
+/**
+ * Game result for leaderboard updates
+ */
+export interface GameResult {
+  winnerName: string;
+  loserName: string;
+  winnerScore: number;
+  loserScore: number;
+  timestamp: number;
+}

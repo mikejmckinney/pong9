@@ -4,11 +4,43 @@ A mobile-first multiplayer Pong game with a Retro Synthwave aesthetic, built wit
 
 ## 🎮 Project Status
 
-**Current Phase:** Pre-development / Template Setup
+**Current Phase:** ✅ Complete (All 4 Phases)
 
-This repository is currently in the template configuration phase. The game implementation has not yet begun.
+The game is fully implemented with:
+- Server-authoritative physics at 60Hz
+- Power-up system with 4 types
+- Firebase leaderboard integration
+- Docker-ready deployment
+- Reconnection handling
 
 ## 🚀 Quick Start
+
+### Running the Game
+
+```bash
+# Install dependencies
+npm install
+
+# Build all packages
+npm run build
+
+# Start the server
+cd server && npm start
+
+# In another terminal, start the client
+cd client && npm run dev
+```
+
+### Docker Deployment
+
+```bash
+# Build and run with Docker
+docker build -t pong9 .
+docker run -p 2567:2567 pong9
+
+# Or use docker-compose
+docker-compose up --build
+```
 
 ### For AI Agents
 
@@ -16,16 +48,6 @@ This repository is currently in the template configuration phase. The game imple
 2. Check [`.context/state/active_task.md`](.context/state/active_task.md) for current phase
 3. Read relevant domain rules from [`.context/rules/`](.context/rules/)
 4. Follow [`AGENTS.md`](./AGENTS.md) for agent interaction guidelines
-
-### For Human Developers
-
-```bash
-# Setup development environment (for Codespaces/VS Code)
-bash install.sh
-
-# Verify template structure
-bash test.sh
-```
 
 ## 📁 Repository Structure
 
@@ -58,6 +80,17 @@ bash test.sh
 - **Backend:** Node.js, Colyseus
 - **Database:** Firebase v9 (Modular SDK)
 - **Testing:** Jest (planned)
+
+### Dependency Version Notes
+
+The following package versions are pinned in `package.json` overrides for compatibility:
+
+| Package | Version | Reason |
+|---------|---------|--------|
+| `@colyseus/core` | 0.16.20 | Required for compatibility with `@colyseus/ws-transport` and stable schema serialization. Later versions (0.16.24+) introduced breaking changes in the transport layer. |
+| `nanoid` | ^2.1.11 | Required for compatibility with Colyseus internal dependencies which expect CommonJS exports. nanoid v3+ uses ESM-only exports which cause issues with the server build. |
+
+**Note:** These version pins are documented here per PR review suggestion to ensure future maintainers understand the compatibility requirements. Do not upgrade without testing the full multiplayer flow.
 
 ## 📋 Development Roadmap
 

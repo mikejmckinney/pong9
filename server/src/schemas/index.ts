@@ -3,3 +3,4 @@
  */
 export { Player } from './Player.js';
 export { GameState } from './GameState.js';
+export { PowerUp, ActiveEffect } from './PowerUp.js';

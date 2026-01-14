@@ -1,0 +1,22 @@
+# Docker Compose for Pong9 local development
+# Usage: docker-compose up --build
+
+version: '3.8'
+
+services:
+  pong9-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "2567:2567"
+    environment:
+      - NODE_ENV=production
+      - PORT=2567
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:2567"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

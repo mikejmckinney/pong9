@@ -23,3 +23,14 @@ export const WINNING_SCORE = 5;
 // Network constants
 export const SERVER_TICK_RATE = 60; // Hz
 export const CLIENT_INTERPOLATION_BUFFER = 100; // ms
+
+// Power-up configuration (Phase 4)
+export const POWERUP_SIZE = 30;
+export const POWERUP_SPAWN_INTERVAL = 10000; // ms between spawn attempts
+export const POWERUP_DURATION = 5000; // ms effect duration
+export const POWERUP_SPAWN_CHANCE = 0.5; // 50% chance to spawn
+
+// Power-up effect values
+export const PADDLE_SIZE_MULTIPLIER = 1.5; // BigPaddle effect
+export const BALL_SPEED_MULTIPLIER = 1.5; // SpeedUp effect
+export const SLOW_BALL_MULTIPLIER = 0.6; // SlowDown effect

@@ -1,12 +1,32 @@
 import { Room, Client } from 'colyseus';
-import { GameState, Player } from '../schemas/index.js';
-import { PlayerInput, GamePhase, PingMessage, PongMessage } from '@pong9/shared/interfaces';
-import { PADDLE_SPEED, SERVER_TICK_RATE, BALL_SPEED } from '@pong9/shared/constants';
+import { GameState, Player, PowerUp, ActiveEffect } from '../schemas/index.js';
+import { PlayerInput, GamePhase, PingMessage, PongMessage, PowerUpType, RoomOptions, GameResult } from '@pong9/shared/interfaces';
+import { leaderboardService } from '../services/LeaderboardService.js';
+import { 
+  PADDLE_SPEED, 
+  SERVER_TICK_RATE, 
+  BALL_SPEED,
+  GAME_WIDTH,
+  GAME_HEIGHT,
+  BALL_SIZE,
+  PADDLE_WIDTH,
+  WINNING_SCORE,
+  POWERUP_SIZE,
+  POWERUP_SPAWN_INTERVAL,
+  POWERUP_DURATION,
+  POWERUP_SPAWN_CHANCE,
+  PADDLE_SIZE_MULTIPLIER,
+  BALL_SPEED_MULTIPLIER,
+  SLOW_BALL_MULTIPLIER
+} from '@pong9/shared/constants';
 
 /**
  * GameRoom handles multiplayer Pong game sessions
  * Per domain_net.md: Server runs physics at 60Hz, client sends intent not position
  */
+// Reconnection grace period in seconds
+const RECONNECTION_TIMEOUT = 30;
+
 export class GameRoom extends Room<GameState> {
   // Map of session IDs to player numbers (1 or 2)
   private playerNumbers = new Map<string, 1 | 2>();
@@ -20,6 +40,15 @@ export class GameRoom extends Room<GameState> {
   private readonly tickIntervalMs: number = 1000 / SERVER_TICK_RATE;
   // Accumulated time for drift compensation
   private accumulatedDrift: number = 0;
+  // Power-up system (Phase 4)
+  private powerUpSpawnInterval: ReturnType<typeof setInterval> | null = null;
+  private powerUpIdCounter: number = 0;
+  // Ball speed modifier from power-ups
+  private ballSpeedModifier: number = 1;
+  // Reconnection tracking: maps player numbers to disconnection timeouts
+  private disconnectionTimeouts = new Map<1 | 2, ReturnType<typeof setTimeout>>();
+  // Track disconnected player info for reconnection
+  private disconnectedPlayers = new Map<1 | 2, { sessionId: string; x: number; y: number }>();
 
   onCreate(): void {
     this.setState(new GameState());
@@ -32,16 +61,36 @@ export class GameRoom extends Room<GameState> {
     console.log(`[GameRoom] Room ${this.roomId} created`);
   }
 
-  onJoin(client: Client): void {
-    console.log(`[GameRoom] Player ${client.sessionId} joined room ${this.roomId}`);
+  onJoin(client: Client, options: RoomOptions): void {
+    const playerName = options.playerName || `Player${this.playerNumbers.size + 1}`;
+    console.log(`[GameRoom] Player ${playerName} (${client.sessionId}) joined room ${this.roomId}`);
 
-    // Determine player number (first player is P1, second is P2)
-    const playerNumber = this.playerNumbers.size === 0 ? 1 : 2;
-    this.playerNumbers.set(client.sessionId, playerNumber as 1 | 2);
+    // Check if this is a reconnection
+    let reconnectedPlayerNumber: 1 | 2 | null = null;
+    for (const [playerNum] of this.disconnectedPlayers) {
+      // Player is reconnecting - assign them their original slot
+      reconnectedPlayerNumber = playerNum;
+      console.log(`[GameRoom] Player reconnecting as P${playerNum}`);
+      
+      // Clear disconnection timeout
+      const timeout = this.disconnectionTimeouts.get(playerNum);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.disconnectionTimeouts.delete(playerNum);
+      }
+      
+      this.disconnectedPlayers.delete(playerNum);
+      break;
+    }
 
-    // Create player schema with explicit player number
-    const player = new Player(playerNumber === 1, playerNumber as 1 | 2);
+    // Determine player number (reconnection or new player)
+    const playerNumber = reconnectedPlayerNumber ?? (this.playerNumbers.size === 0 ? 1 : 2) as 1 | 2;
+    this.playerNumbers.set(client.sessionId, playerNumber);
+
+    // Create or restore player schema with name
+    const player = new Player(playerNumber === 1, playerNumber, playerName);
     player.sessionId = client.sessionId;
+    player.connected = true;
     this.state.players.set(client.sessionId, player);
 
     // Initialize input state
@@ -49,33 +98,102 @@ export class GameRoom extends Room<GameState> {
 
     // Check if we have both players to start the game
     if (this.playerNumbers.size === 2) {
-      this.startGame();
+      // If game was paused due to disconnection, resume it
+      if (this.state.phase === GamePhase.WAITING) {
+        this.startGame();
+      } else if (reconnectedPlayerNumber !== null) {
+        // Player reconnected during ongoing game - resume simulation
+        client.send('status', { message: 'Reconnected!' });
+        console.log(`[GameRoom] Player ${playerNumber} reconnected to ongoing game`);
+        // Resume the paused simulation
+        this.resumeFromReconnection();
+      }
     } else {
       // Notify that we're waiting for another player
       client.send('status', { message: 'Waiting for opponent...' });
     }
   }
 
-  onLeave(client: Client, consented: boolean): void {
+  async onLeave(client: Client, consented: boolean): Promise<void> {
     console.log(`[GameRoom] Player ${client.sessionId} left room ${this.roomId} (consented: ${consented})`);
 
+    const playerNumber = this.playerNumbers.get(client.sessionId);
     const player = this.state.players.get(client.sessionId);
+    
     if (player) {
       player.connected = false;
     }
 
-    this.playerNumbers.delete(client.sessionId);
-    this.playerInputs.delete(client.sessionId);
+    // If player intentionally left (closed tab, clicked leave), end immediately
+    if (consented) {
+      this.cleanupDisconnectedPlayer(client.sessionId, playerNumber);
+      if (this.state.phase === GamePhase.PLAYING) {
+        this.endGame('Opponent disconnected');
+      }
+      return;
+    }
 
-    // If game was in progress and a player leaves, end the game
-    if (this.state.phase === GamePhase.PLAYING) {
-      this.endGame();
+    // Unintentional disconnect - allow reconnection
+    if (playerNumber && this.state.phase === GamePhase.PLAYING) {
+      console.log(`[GameRoom] Allowing ${RECONNECTION_TIMEOUT}s for P${playerNumber} to reconnect`);
+      
+      // Store disconnected player info
+      if (player) {
+        this.disconnectedPlayers.set(playerNumber, {
+          sessionId: client.sessionId,
+          x: player.x,
+          y: player.y
+        });
+      }
+
+      // PAUSE SIMULATION during reconnection grace period
+      // Fix for: "Pause simulation during reconnection grace period"
+      // https://github.com/PR#comment - chatgpt-codex-connector suggestion
+      this.pauseForReconnection();
+
+      // Broadcast disconnection to remaining player
+      this.broadcast('status', { message: `Player ${playerNumber} disconnected. Waiting ${RECONNECTION_TIMEOUT}s for reconnection...` });
+
+      // Set timeout to end game if player doesn't reconnect
+      const timeout = setTimeout(() => {
+        console.log(`[GameRoom] P${playerNumber} did not reconnect in time`);
+        this.disconnectedPlayers.delete(playerNumber);
+        this.cleanupDisconnectedPlayer(client.sessionId, playerNumber);
+        this.endGame('Opponent did not reconnect');
+      }, RECONNECTION_TIMEOUT * 1000);
+
+      this.disconnectionTimeouts.set(playerNumber, timeout);
+    } else {
+      this.cleanupDisconnectedPlayer(client.sessionId, playerNumber);
+    }
+  }
+
+  /**
+   * Clean up a disconnected player's data
+   */
+  private cleanupDisconnectedPlayer(sessionId: string, playerNumber: 1 | 2 | undefined): void {
+    this.playerNumbers.delete(sessionId);
+    this.playerInputs.delete(sessionId);
+    this.state.players.delete(sessionId);
+    
+    if (playerNumber) {
+      const timeout = this.disconnectionTimeouts.get(playerNumber);
+      if (timeout) {
+        clearTimeout(timeout);
+        this.disconnectionTimeouts.delete(playerNumber);
+      }
     }
   }
 
   onDispose(): void {
     console.log(`[GameRoom] Room ${this.roomId} disposed`);
     this.stopSimulation();
+    
+    // Clear all reconnection timeouts
+    for (const timeout of this.disconnectionTimeouts.values()) {
+      clearTimeout(timeout);
+    }
+    this.disconnectionTimeouts.clear();
   }
 
   /**
@@ -112,6 +230,9 @@ export class GameRoom extends Room<GameState> {
     this.lastTickTime = Date.now();
     this.accumulatedDrift = 0;
     this.scheduleNextTick();
+
+    // Start power-up spawning (Phase 4)
+    this.startPowerUpSpawning();
 
     // Launch ball after a short delay (1 second)
     setTimeout(() => this.launchBall(), 1000);
@@ -153,14 +274,200 @@ export class GameRoom extends Room<GameState> {
     const deltaSeconds = (now - this.lastTickTime) / 1000;
     this.lastTickTime = now;
 
-    // Process player inputs
+    // Process player inputs (moves paddles)
     this.processInputs(deltaSeconds);
 
-    // Ball physics will be implemented in Phase 3
-    // For now, just update player positions based on inputs
+    // Update ball physics (movement, collisions, scoring)
+    this.updateBallPhysics(deltaSeconds);
+
+    // Check power-up collisions (Phase 4)
+    this.checkPowerUpCollisions();
+
+    // Update active effects (check expiration)
+    this.updateActiveEffects();
 
     // Schedule the next tick with drift compensation
     this.scheduleNextTick();
+  }
+
+  /**
+   * Update ball physics - movement, collisions, and scoring
+   * This is the authoritative physics simulation (Phase 3)
+   */
+  private updateBallPhysics(deltaSeconds: number): void {
+    // Only update if ball has velocity
+    if (this.state.ballVelX === 0 && this.state.ballVelY === 0) return;
+
+    const halfBall = BALL_SIZE / 2;
+    
+    // Calculate new position
+    let newX = this.state.ballX + this.state.ballVelX * deltaSeconds;
+    let newY = this.state.ballY + this.state.ballVelY * deltaSeconds;
+
+    // Top/bottom wall collision (bounce)
+    if (newY - halfBall <= 0) {
+      newY = halfBall;
+      this.state.ballVelY = Math.abs(this.state.ballVelY);
+    } else if (newY + halfBall >= GAME_HEIGHT) {
+      newY = GAME_HEIGHT - halfBall;
+      this.state.ballVelY = -Math.abs(this.state.ballVelY);
+    }
+
+    // Check for paddle collisions
+    const paddleCollision = this.checkPaddleCollision(newX, newY);
+    if (paddleCollision) {
+      const { newVelX, newVelY, adjustedX } = paddleCollision;
+      this.state.ballVelX = newVelX;
+      this.state.ballVelY = newVelY;
+      newX = adjustedX;
+    }
+
+    // Left/right wall collision (scoring)
+    if (newX - halfBall <= 0) {
+      // Player 2 scores
+      this.handleScore(2);
+      return;
+    } else if (newX + halfBall >= GAME_WIDTH) {
+      // Player 1 scores
+      this.handleScore(1);
+      return;
+    }
+
+    // Update ball position
+    this.state.ballX = newX;
+    this.state.ballY = newY;
+  }
+
+  /**
+   * Check for paddle collisions and return new velocity if collision occurred
+   */
+  private checkPaddleCollision(
+    ballX: number, 
+    ballY: number
+  ): { newVelX: number; newVelY: number; adjustedX: number } | null {
+    const halfBall = BALL_SIZE / 2;
+    const halfPaddleWidth = PADDLE_WIDTH / 2;
+
+    // Get player paddles
+    let player1: Player | undefined;
+    let player2: Player | undefined;
+
+    for (const player of this.state.players.values()) {
+      if (player.playerNumber === 1) player1 = player;
+      else if (player.playerNumber === 2) player2 = player;
+    }
+
+    // Check Player 1 paddle (left side) - use effective paddle height for power-ups
+    if (player1 && this.state.ballVelX < 0) {
+      const halfPaddleHeight = player1.getEffectivePaddleHeight() / 2;
+      const paddleLeft = player1.x - halfPaddleWidth;
+      const paddleRight = player1.x + halfPaddleWidth;
+      const paddleTop = player1.y - halfPaddleHeight;
+      const paddleBottom = player1.y + halfPaddleHeight;
+
+      if (ballX - halfBall <= paddleRight && 
+          ballX + halfBall >= paddleLeft &&
+          ballY + halfBall >= paddleTop && 
+          ballY - halfBall <= paddleBottom) {
+        return this.calculateBounce(player1, ballY, 1);
+      }
+    }
+
+    // Check Player 2 paddle (right side) - use effective paddle height for power-ups
+    if (player2 && this.state.ballVelX > 0) {
+      const halfPaddleHeight = player2.getEffectivePaddleHeight() / 2;
+      const paddleLeft = player2.x - halfPaddleWidth;
+      const paddleRight = player2.x + halfPaddleWidth;
+      const paddleTop = player2.y - halfPaddleHeight;
+      const paddleBottom = player2.y + halfPaddleHeight;
+
+      if (ballX + halfBall >= paddleLeft && 
+          ballX - halfBall <= paddleRight &&
+          ballY + halfBall >= paddleTop && 
+          ballY - halfBall <= paddleBottom) {
+        return this.calculateBounce(player2, ballY, -1);
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Calculate ball bounce off paddle based on where it hits
+   * Physics: Ball deflects based on relative hit position
+   * - Hit top of paddle (ballY < paddle.y) → ball deflects upward (negative Y velocity)
+   * - Hit bottom of paddle (ballY > paddle.y) → ball deflects downward (positive Y velocity)
+   */
+  private calculateBounce(
+    paddle: Player, 
+    ballY: number, 
+    direction: 1 | -1
+  ): { newVelX: number; newVelY: number; adjustedX: number } {
+    const halfPaddleHeight = paddle.getEffectivePaddleHeight() / 2;
+    const halfPaddleWidth = PADDLE_WIDTH / 2;
+    const halfBall = BALL_SIZE / 2;
+
+    // Calculate relative intersection (-1 to 1)
+    // Positive = ball hit top of paddle, Negative = ball hit bottom
+    const relativeIntersect = (paddle.y - ballY) / halfPaddleHeight;
+    
+    // Calculate bounce angle (max 60 degrees)
+    const maxBounceAngle = Math.PI / 3; // 60 degrees
+    const bounceAngle = relativeIntersect * maxBounceAngle;
+
+    // Current speed with 5% increase per hit (capped at 2x base speed * speed modifier)
+    // Speed increase makes rallies more exciting as they progress
+    let currentSpeed = Math.sqrt(
+      this.state.ballVelX * this.state.ballVelX + 
+      this.state.ballVelY * this.state.ballVelY
+    );
+    // Guard against zero speed (defensive coding to prevent NaN)
+    if (currentSpeed === 0) {
+      currentSpeed = BALL_SPEED * this.ballSpeedModifier;
+    }
+    const maxSpeed = BALL_SPEED * 2 * this.ballSpeedModifier;
+    const newSpeed = Math.min(currentSpeed * 1.05, maxSpeed);
+
+    // Calculate new velocities
+    // X velocity: direction determines left/right movement
+    // Y velocity: negative sin because positive angle should deflect upward (negative Y in screen coords)
+    const newVelX = direction * newSpeed * Math.cos(bounceAngle);
+    const newVelY = -newSpeed * Math.sin(bounceAngle);
+
+    // Adjust X position to avoid ball getting stuck in paddle
+    const adjustedX = direction === 1 
+      ? paddle.x + halfPaddleWidth + halfBall + 1
+      : paddle.x - halfPaddleWidth - halfBall - 1;
+
+    return { newVelX, newVelY, adjustedX };
+  }
+
+  /**
+   * Handle scoring - update score and reset ball or end game
+   */
+  private handleScore(player: 1 | 2): void {
+    if (player === 1) {
+      this.state.score1++;
+      console.log(`[GameRoom] Player 1 scores! Score: ${this.state.score1}-${this.state.score2}`);
+    } else {
+      this.state.score2++;
+      console.log(`[GameRoom] Player 2 scores! Score: ${this.state.score1}-${this.state.score2}`);
+    }
+
+    // Check for winner
+    if (this.state.score1 >= WINNING_SCORE) {
+      this.state.winner = 1;
+      this.endGame('Player 1 wins!');
+      return;
+    } else if (this.state.score2 >= WINNING_SCORE) {
+      this.state.winner = 2;
+      this.endGame('Player 2 wins!');
+      return;
+    }
+
+    // Reset ball to center and launch after delay
+    this.state.resetBall();
+    setTimeout(() => this.launchBall(), 1000);
   }
 
   /**
@@ -188,15 +495,13 @@ export class GameRoom extends Room<GameState> {
 
   /**
    * Launch the ball with a random direction
-   * Full physics will be in Phase 3, this is just placeholder velocity
    */
   private launchBall(): void {
     if (this.state.phase !== GamePhase.PLAYING) return;
     
-    // For Phase 2, just set initial velocity
-    // Full physics implementation in Phase 3
+    // Random direction: -30 to +30 degrees
     const direction = Math.random() > 0.5 ? 1 : -1;
-    const angle = (Math.random() - 0.5) * Math.PI / 3; // -30 to +30 degrees
+    const angle = (Math.random() - 0.5) * Math.PI / 3;
     
     this.state.ballVelX = direction * BALL_SPEED * Math.cos(angle);
     this.state.ballVelY = BALL_SPEED * Math.sin(angle);
@@ -205,13 +510,46 @@ export class GameRoom extends Room<GameState> {
   }
 
   /**
-   * End the game (player disconnection or other reason)
+   * End the game (player disconnection, winner, or other reason)
    */
-  private endGame(): void {
-    console.log(`[GameRoom] Ending game in room ${this.roomId}`);
+  private async endGame(reason: string = 'Player disconnected'): Promise<void> {
+    console.log(`[GameRoom] Ending game in room ${this.roomId}: ${reason}`);
     this.state.phase = GamePhase.FINISHED;
     this.stopSimulation();
-    this.broadcast('gameEnd', { reason: 'Player disconnected' });
+    this.stopPowerUpSpawning();
+    this.broadcast('gameEnd', { reason });
+
+    // Record game result to leaderboard if there's a winner
+    if (this.state.winner > 0) {
+      await this.recordGameToLeaderboard();
+    }
+  }
+
+  /**
+   * Record game result to Firebase leaderboard
+   */
+  private async recordGameToLeaderboard(): Promise<void> {
+    // Find winner and loser players
+    let winnerName = 'Player1';
+    let loserName = 'Player2';
+
+    for (const player of this.state.players.values()) {
+      if (player.playerNumber === this.state.winner) {
+        winnerName = player.name;
+      } else {
+        loserName = player.name;
+      }
+    }
+
+    const result: GameResult = {
+      winnerName,
+      loserName,
+      winnerScore: this.state.winner === 1 ? this.state.score1 : this.state.score2,
+      loserScore: this.state.winner === 1 ? this.state.score2 : this.state.score1,
+      timestamp: Date.now()
+    };
+
+    await leaderboardService.recordGameResult(result);
   }
 
   /**
@@ -221,6 +559,260 @@ export class GameRoom extends Room<GameState> {
     if (this.simulationInterval) {
       clearTimeout(this.simulationInterval);
       this.simulationInterval = null;
+    }
+  }
+
+  /**
+   * Pause simulation during reconnection grace period
+   * Freezes ball and notifies remaining player
+   * Fix for: https://github.com/PR#comment - "Pause simulation during reconnection grace period"
+   */
+  private pauseForReconnection(): void {
+    // Stop the simulation loop
+    this.stopSimulation();
+    
+    // Freeze the ball by zeroing velocity
+    this.state.ballVelX = 0;
+    this.state.ballVelY = 0;
+    
+    // Stop power-up spawning during pause
+    this.stopPowerUpSpawning();
+    
+    console.log('[GameRoom] Game paused for reconnection');
+  }
+
+  /**
+   * Resume simulation after player reconnects
+   */
+  private resumeFromReconnection(): void {
+    if (this.state.phase !== GamePhase.PLAYING) return;
+    
+    console.log('[GameRoom] Resuming game after reconnection');
+    
+    // Restart simulation loop
+    this.lastTickTime = Date.now();
+    this.accumulatedDrift = 0;
+    this.scheduleNextTick();
+    
+    // Restart power-up spawning
+    this.startPowerUpSpawning();
+    
+    // Re-launch ball after a short delay
+    this.broadcast('status', { message: 'Player reconnected! Resuming...' });
+    setTimeout(() => this.launchBall(), 1500);
+  }
+
+  // ==================== Power-Up System (Phase 4) ====================
+
+  /**
+   * Start periodic power-up spawning
+   */
+  private startPowerUpSpawning(): void {
+    this.powerUpSpawnInterval = setInterval(() => {
+      this.trySpawnPowerUp();
+    }, POWERUP_SPAWN_INTERVAL);
+  }
+
+  /**
+   * Stop power-up spawning
+   */
+  private stopPowerUpSpawning(): void {
+    if (this.powerUpSpawnInterval) {
+      clearInterval(this.powerUpSpawnInterval);
+      this.powerUpSpawnInterval = null;
+    }
+  }
+
+  /**
+   * Attempt to spawn a power-up with random chance
+   */
+  private trySpawnPowerUp(): void {
+    if (this.state.phase !== GamePhase.PLAYING) return;
+    
+    // Only spawn if there's no active power-up
+    if (this.state.powerUps.size > 0) return;
+
+    // Random chance to spawn
+    if (Math.random() > POWERUP_SPAWN_CHANCE) return;
+
+    // Random position in center area (avoid edges)
+    const margin = 200;
+    const x = margin + Math.random() * (GAME_WIDTH - margin * 2);
+    const y = margin + Math.random() * (GAME_HEIGHT - margin * 2);
+
+    // Random power-up type
+    const types = Object.values(PowerUpType);
+    const type = types[Math.floor(Math.random() * types.length)];
+
+    // Create power-up
+    const id = `powerup_${++this.powerUpIdCounter}`;
+    const powerUp = new PowerUp(id, type, x, y);
+    this.state.powerUps.set(id, powerUp);
+
+    console.log(`[GameRoom] Spawned ${type} power-up at (${x.toFixed(0)}, ${y.toFixed(0)})`);
+  }
+
+  /**
+   * Check if ball collides with any power-up
+   */
+  private checkPowerUpCollisions(): void {
+    const halfBall = BALL_SIZE / 2;
+    const halfPowerUp = POWERUP_SIZE / 2;
+
+    for (const [id, powerUp] of this.state.powerUps) {
+      if (!powerUp.active) continue;
+
+      // Simple AABB collision
+      const dx = Math.abs(this.state.ballX - powerUp.x);
+      const dy = Math.abs(this.state.ballY - powerUp.y);
+
+      if (dx < halfBall + halfPowerUp && dy < halfBall + halfPowerUp) {
+        // Determine which player gets the power-up based on ball direction
+        // Ball moving right (velX > 0) = heading toward P2, so P2 gets the power-up
+        // Ball moving left (velX < 0) = heading toward P1, so P1 gets the power-up
+        const playerId = this.state.ballVelX > 0 
+          ? this.getPlayerByNumber(2)?.sessionId 
+          : this.getPlayerByNumber(1)?.sessionId;
+        
+        if (playerId) {
+          this.applyPowerUp(powerUp.powerUpType as PowerUpType, playerId);
+        }
+
+        // Remove power-up
+        this.state.powerUps.delete(id);
+        console.log(`[GameRoom] Power-up ${powerUp.powerUpType} collected!`);
+      }
+    }
+  }
+
+  /**
+   * Get player by their number (1 or 2)
+   */
+  private getPlayerByNumber(num: 1 | 2): Player | undefined {
+    for (const player of this.state.players.values()) {
+      if (player.playerNumber === num) return player;
+    }
+    return undefined;
+  }
+
+  /**
+   * Apply power-up effect to player
+   */
+  private applyPowerUp(type: PowerUpType, playerId: string): void {
+    const player = this.state.players.get(playerId);
+    if (!player) return;
+
+    // Apply immediate effect
+    switch (type) {
+      case PowerUpType.BIG_PADDLE: {
+        // Create active effect for the collector
+        const effect = new ActiveEffect(type, playerId, POWERUP_DURATION);
+        this.state.activeEffects.push(effect);
+        player.paddleScale = PADDLE_SIZE_MULTIPLIER;
+        console.log(`[GameRoom] Player ${player.playerNumber} paddle enlarged!`);
+        break;
+      }
+
+      case PowerUpType.SHRINK_OPPONENT: {
+        // Find opponent and apply effect to them (not the collector)
+        const opponentNum = player.playerNumber === 1 ? 2 : 1;
+        const opponent = this.getPlayerByNumber(opponentNum);
+        if (opponent) {
+          opponent.paddleScale = 1 / PADDLE_SIZE_MULTIPLIER;
+          // Create effect for opponent only
+          const opponentEffect = new ActiveEffect(type, opponent.sessionId, POWERUP_DURATION);
+          this.state.activeEffects.push(opponentEffect);
+          console.log(`[GameRoom] Player ${opponent.playerNumber} paddle shrunk!`);
+        }
+        break;
+      }
+
+      case PowerUpType.SPEED_UP: {
+        // Only allow one speed effect at a time - reset any existing speed modifiers
+        this.ballSpeedModifier = BALL_SPEED_MULTIPLIER;
+        this.applyBallSpeedModifier();
+        // Create effect (use collector's ID to track expiration)
+        const effect = new ActiveEffect(type, playerId, POWERUP_DURATION);
+        this.state.activeEffects.push(effect);
+        console.log(`[GameRoom] Ball speed increased!`);
+        break;
+      }
+
+      case PowerUpType.SLOW_DOWN: {
+        // Only allow one speed effect at a time - reset any existing speed modifiers
+        this.ballSpeedModifier = SLOW_BALL_MULTIPLIER;
+        this.applyBallSpeedModifier();
+        // Create effect (use collector's ID to track expiration)
+        const effect = new ActiveEffect(type, playerId, POWERUP_DURATION);
+        this.state.activeEffects.push(effect);
+        console.log(`[GameRoom] Ball speed decreased!`);
+        break;
+      }
+    }
+  }
+
+  /**
+   * Apply current ball speed modifier
+   */
+  private applyBallSpeedModifier(): void {
+    const currentSpeed = Math.sqrt(
+      this.state.ballVelX * this.state.ballVelX +
+      this.state.ballVelY * this.state.ballVelY
+    );
+    
+    if (currentSpeed === 0) return;
+
+    // Calculate target speed
+    const targetSpeed = BALL_SPEED * this.ballSpeedModifier;
+    const scale = targetSpeed / currentSpeed;
+
+    this.state.ballVelX *= scale;
+    this.state.ballVelY *= scale;
+  }
+
+  /**
+   * Update active effects and remove expired ones
+   */
+  private updateActiveEffects(): void {
+    const now = Date.now();
+    const expiredIndices: number[] = [];
+
+    // Find expired effects
+    for (let i = 0; i < this.state.activeEffects.length; i++) {
+      const effect = this.state.activeEffects[i];
+      if (now >= effect.expiresAt) {
+        expiredIndices.push(i);
+        this.removeEffect(effect);
+      }
+    }
+
+    // Remove expired effects (in reverse order to maintain indices)
+    for (let i = expiredIndices.length - 1; i >= 0; i--) {
+      this.state.activeEffects.splice(expiredIndices[i], 1);
+    }
+  }
+
+  /**
+   * Remove an effect and restore normal state
+   */
+  private removeEffect(effect: ActiveEffect): void {
+    const player = this.state.players.get(effect.playerId);
+    
+    switch (effect.effectType as PowerUpType) {
+      case PowerUpType.BIG_PADDLE:
+      case PowerUpType.SHRINK_OPPONENT:
+        if (player) {
+          player.paddleScale = 1;
+          console.log(`[GameRoom] Player ${player.playerNumber} paddle restored to normal`);
+        }
+        break;
+
+      case PowerUpType.SPEED_UP:
+      case PowerUpType.SLOW_DOWN:
+        this.ballSpeedModifier = 1;
+        this.applyBallSpeedModifier();
+        console.log(`[GameRoom] Ball speed restored to normal`);
+        break;
     }
   }
 }

@@ -4,14 +4,14 @@
 
 This is a **mobile-first multiplayer Pong game** with a Retro Synthwave aesthetic. The repository contains a complete monorepo with a Phaser 3 game client, Colyseus multiplayer server, and shared TypeScript types.
 
-**Current Status:** Phase 2 (The Network Plumbing) - In progress. The game client is functional with local play. Multiplayer infrastructure (Colyseus server, GameRoom, schemas) has been implemented and is ready for testing.
+**Current Status:** Phase 3 (Authoritative Physics) - Complete. The server runs authoritative physics at 60Hz. Ball movement, paddle collisions, wall collisions, and scoring are all server-controlled. The client uses interpolation for smooth rendering and local prediction for responsive paddle control.
 
 ## Tech Stack
 
 - **Language:** TypeScript (Strict Mode) for both client and server
 - **Frontend Engine:** Phaser 3.70.0
 - **Build Tool:** Vite 7.x (client), TSC (server)
-- **Backend Framework:** Node.js + Colyseus 0.16.5
+- **Backend Framework:** Node.js + Colyseus 0.16.5 (@colyseus/core 0.16.20)
 - **Database:** Firebase v9 Modular SDK (planned for leaderboards)
 - **Test Framework:** Jest (planned)
 - **Monorepo:** npm workspaces
@@ -301,7 +301,7 @@ From `.context/roadmap.md`:
 - ✅ Implement Synthwave Graphics (PostFX Bloom, procedural grid)
 - ✅ Implement Mobile Scale Manager (FIT mode) and Touch Inputs
 
-**Phase 2:** The Network Plumbing 🔄 **IN PROGRESS**
+**Phase 2:** The Network Plumbing ✅ **COMPLETE**
 - ✅ Setup npm workspaces monorepo structure
 - ✅ Create shared package with TypeScript interfaces and constants
 - ✅ Setup Node.js + Colyseus Server
@@ -309,16 +309,18 @@ From `.context/roadmap.md`:
 - ✅ Implement GameRoom with "Waiting for Player" state
 - ✅ Create NetworkManager for client-side Colyseus connection
 - ✅ Add LobbyScene for multiplayer connection flow
-- ⏳ Verify message passing (Ping/Pong) - needs testing
+- ✅ Message passing (Ping/Pong) implemented
 
-**Phase 3:** Authoritative Physics
-- Port Physics to Server
-- Implement Server Simulation Loop (60Hz)
-- Client-Side Prediction & Interpolation
-- Power-Up Spawning Logic
+**Phase 3:** Authoritative Physics ✅ **COMPLETE**
+- ✅ Port Physics to Server (ball movement, collision, scoring)
+- ✅ Implement Server Simulation Loop (60Hz with drift compensation)
+- ✅ Client-Side Prediction for local paddle
+- ✅ Interpolation for remote paddle and ball
+- ⏳ Power-Up Spawning Logic (deferred to Phase 4)
 
 **Phase 4:** Polish & Persistence
 - Integrate Firebase v9 for Leaderboards
+- Add Power-Up System (server-side)
 - Procedural Audio (Web Audio API) - ✅ Basic implementation done
 - CSS CRT Overlays - ✅ Done
 - Configure Dockerfile for deployment

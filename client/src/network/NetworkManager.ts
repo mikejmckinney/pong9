@@ -1,5 +1,5 @@
 import { Client, Room } from 'colyseus.js';
-import { GamePhase, PlayerInput, PongMessage } from '@pong9/shared/interfaces';
+import { GamePhase, PlayerInput, PongMessage, PowerUpType, RoomOptions } from '@pong9/shared/interfaces';
 
 /**
  * Callback types for network events
@@ -27,6 +27,9 @@ export interface GameStateSnapshot {
   score2: number;
   phase: string;
   winner: number;
+  // Power-ups (Phase 4)
+  powerUps: Map<string, PowerUpSnapshot>;
+  activeEffects: ActiveEffectSnapshot[];
 }
 
 export interface PlayerSnapshot {
@@ -35,6 +38,21 @@ export interface PlayerSnapshot {
   sessionId: string;
   connected: boolean;
   playerNumber: 1 | 2;
+  paddleScale: number; // Power-up: paddle size multiplier
+}
+
+export interface PowerUpSnapshot {
+  id: string;
+  type: PowerUpType;
+  x: number;
+  y: number;
+  active: boolean;
+}
+
+export interface ActiveEffectSnapshot {
+  type: PowerUpType;
+  playerId: string;
+  expiresAt: number;
 }
 
 /**
@@ -65,10 +83,10 @@ export class NetworkManager {
   /**
    * Connect to a game room
    */
-  async connect(): Promise<void> {
+  async connect(options: RoomOptions = {}): Promise<void> {
     try {
-      // Join or create a game room
-      this.room = await this.client.joinOrCreate('game');
+      // Join or create a game room with options
+      this.room = await this.client.joinOrCreate('game', options);
       this.sessionId = this.room.sessionId;
 
       console.log(`[NetworkManager] Connected to room: ${this.room.roomId}, sessionId: ${this.sessionId}`);
@@ -213,7 +231,7 @@ export class NetworkManager {
   private stateToSnapshot(state: unknown): GameStateSnapshot {
     // Type assertion for Colyseus state
     const s = state as {
-      players: Map<string, { x: number; y: number; sessionId: string; connected: boolean; playerNumber: 1 | 2 }>;
+      players: Map<string, { x: number; y: number; sessionId: string; connected: boolean; playerNumber: 1 | 2; paddleScale: number }>;
       ballX: number;
       ballY: number;
       ballVelX: number;
@@ -222,6 +240,8 @@ export class NetworkManager {
       score2: number;
       phase: string;
       winner: number;
+      powerUps: Map<string, { id: string; powerUpType: string; x: number; y: number; active: boolean }>;
+      activeEffects: Array<{ effectType: string; playerId: string; expiresAt: number }>;
     };
 
     const playersSnapshot = new Map<string, PlayerSnapshot>();
@@ -232,6 +252,29 @@ export class NetworkManager {
         sessionId: player.sessionId,
         connected: player.connected,
         playerNumber: player.playerNumber,
+        paddleScale: player.paddleScale ?? 1,
+      });
+    });
+
+    // Convert power-ups
+    const powerUpsSnapshot = new Map<string, PowerUpSnapshot>();
+    s.powerUps?.forEach((powerUp, key) => {
+      powerUpsSnapshot.set(key, {
+        id: powerUp.id,
+        type: powerUp.powerUpType as PowerUpType,
+        x: powerUp.x,
+        y: powerUp.y,
+        active: powerUp.active,
+      });
+    });
+
+    // Convert active effects
+    const activeEffectsSnapshot: ActiveEffectSnapshot[] = [];
+    s.activeEffects?.forEach((effect) => {
+      activeEffectsSnapshot.push({
+        type: effect.effectType as PowerUpType,
+        playerId: effect.playerId,
+        expiresAt: effect.expiresAt,
       });
     });
 
@@ -245,6 +288,8 @@ export class NetworkManager {
       score2: s.score2,
       phase: s.phase,
       winner: s.winner,
+      powerUps: powerUpsSnapshot,
+      activeEffects: activeEffectsSnapshot,
     };
   }
 

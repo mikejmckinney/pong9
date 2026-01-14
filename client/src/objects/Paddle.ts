@@ -29,6 +29,13 @@ export class Paddle {
     this.sprite.y = y;
   }
 
+  /**
+   * Set paddle scale for power-up effects
+   */
+  setScale(scaleX: number, scaleY: number): void {
+    this.sprite.setScale(scaleX, scaleY);
+  }
+
   clampPosition(maxHeight: number): void {
     const halfHeight = this.sprite.displayHeight / 2;
     this.sprite.y = Phaser.Math.Clamp(this.sprite.y, halfHeight, maxHeight - halfHeight);

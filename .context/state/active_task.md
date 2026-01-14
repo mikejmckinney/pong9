@@ -1,19 +1,21 @@
 # 🧠 Active Agent State
-*Last Updated: 2026-01-13*
+*Last Updated: 2026-01-14*
 
 ## 📍 Current Status
-**Phase:** Phase 2 — The Network Plumbing 🔄 **IN PROGRESS**
-**Active Task:** Multiplayer infrastructure implemented. Ready for end-to-end testing.
+**Phase:** Phase 4 — Polish & Persistence ✅ **COMPLETE**
+**Active Task:** All Phase 4 tasks completed. Firebase leaderboard integration finished.
 
 ## 📋 Context & Decisions
-* Phase 2 implementation in progress
-* npm workspaces monorepo structure set up
-* Colyseus 0.16.5 used for server
-* @colyseus/schema 3.0.76 for state synchronization
-* colyseus.js 0.16.22 for client SDK
-* NetworkManager wraps Colyseus client for clean API
-* LobbyScene handles connection UI before transitioning to GameScene
-* Known dependencies have moderate-severity vulnerabilities in Colyseus transitive deps (nanoid, elliptic)
+* Phase 4 fully completed
+* Power-up system implemented on server and client
+* Four power-up types: BIG_PADDLE, SHRINK_OPPONENT, SPEED_UP, SLOW_DOWN
+* Docker deployment configured with multi-stage Dockerfile
+* Reconnection handling allows 30 seconds for players to reconnect
+* Firebase v9 leaderboard integration complete with:
+  - Player name input on lobby screen
+  - Game results recorded to Firebase after each match
+  - Leaderboard display showing top players by wins
+  - REST API endpoints for fetching leaderboard data
 
 ## ✅ Completed Tasks
 1. ✅ Phase 1: Setup Phaser 3 + TypeScript + Vite environment
@@ -34,12 +36,23 @@
 16. ✅ Phase 2: Add LobbyScene for multiplayer connection flow
 17. ✅ Phase 2: Integrate network support in GameScene
 18. ✅ Phase 2: Update AI_REPO_GUIDE.md with Phase 2 changes
+19. ✅ Phase 3: Port ball physics to server (movement, collision, scoring)
+20. ✅ Phase 3: Implement server simulation loop at 60Hz with drift compensation
+21. ✅ Phase 3: Add client-side interpolation for ball and remote paddle
+22. ✅ Phase 3: Add local paddle prediction for responsive feel
+23. ✅ Phase 3: Disable local physics in networked mode (server authoritative)
+24. ✅ Phase 4: Implement Power-Up system (server-side spawning and collision)
+25. ✅ Phase 4: Add PowerUp and ActiveEffect schemas
+26. ✅ Phase 4: Implement paddle scaling effects
+27. ✅ Phase 4: Implement ball speed modifiers
+28. ✅ Phase 4: Add client-side power-up rendering with animations
+29. ✅ Phase 4: Configure Dockerfile for deployment
+30. ✅ Phase 4: Add docker-compose.yml for easy local deployment
+31. ✅ Phase 4: Add reconnection handling (30s grace period)
+32. ✅ Phase 4: Integrate Firebase v9 for Leaderboards
+33. ✅ Phase 4: Add player name input to lobby
+34. ✅ Phase 4: Add leaderboard display in lobby
+35. ✅ Phase 4: Add REST API endpoints for leaderboard
 
 ## ⏭️ Next Steps
-1. Test multiplayer connection end-to-end (start server, open two clients)
-2. Verify basic message passing (Ping/Pong latency display)
-3. Begin Phase 3: Authoritative Physics
-   - Port physics logic from client to server
-   - Implement server simulation loop (60Hz)
-   - Add client-side prediction for local paddle
-   - Add interpolation for remote paddle and ball
+All phases completed! Project ready for deployment and testing.

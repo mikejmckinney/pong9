@@ -1,8 +1,10 @@
 import Phaser from 'phaser';
 import { Paddle } from '../objects/Paddle.ts';
 import { Ball } from '../objects/Ball.ts';
+import { PowerUpObject } from '../objects/PowerUp.ts';
 import { TouchInputManager } from '../input/TouchInputManager.ts';
-import { NetworkManager, GameStateSnapshot } from '../network/NetworkManager.ts';
+import { NetworkManager, GameStateSnapshot, PowerUpSnapshot } from '../network/NetworkManager.ts';
+import { PADDLE_SPEED, BALL_SPEED, WINNING_SCORE } from '@pong9/shared/constants';
 
 // Palette Constants (match values in domain_ui.md)
 export const COLORS = {
@@ -13,10 +15,9 @@ export const COLORS = {
   BALL: 0xffffff,   // White
 };
 
-// Game Constants
-const PADDLE_SPEED = 500;
-const BALL_SPEED = 400;
-const WINNING_SCORE = 5;
+// Reconciliation threshold per domain_net.md
+// "Reconcile with server state only if deviation > 5px"
+const RECONCILIATION_THRESHOLD = 5;
 
 // Scene data interface for type safety
 interface GameSceneData {
@@ -44,10 +45,27 @@ export class GameScene extends Phaser.Scene {
     p2Down: Phaser.Input.Keyboard.Key;
     restart: Phaser.Input.Keyboard.Key;
   };
-  // Network support (Phase 2)
+  // Network support (Phase 2+3)
   private networkManager?: NetworkManager;
   private isNetworked = false;
   private latencyText?: Phaser.GameObjects.Text;
+
+  // Interpolation state for networked play (Phase 3)
+  // Store target positions for smooth lerping
+  private targetBallX = 0;
+  private targetBallY = 0;
+  private targetPaddle1Y = 0;
+  private targetPaddle2Y = 0;
+  // Ball velocity for extrapolation between server updates
+  private serverBallVelX = 0;
+  private serverBallVelY = 0;
+  // Interpolation factor (0 = instant, higher = smoother but more lag)
+  private readonly INTERPOLATION_SPEED = 0.3;
+
+  // Power-up rendering (Phase 4)
+  private powerUpObjects = new Map<string, PowerUpObject>();
+  private paddle1Scale = 1;
+  private paddle2Scale = 1;
 
   constructor() {
     super('GameScene');
@@ -98,15 +116,35 @@ export class GameScene extends Phaser.Scene {
     // Setup network mode if available
     if (this.isNetworked) {
       this.setupNetworkMode(width);
+      // In networked mode, disable local ball physics - server is authoritative
+      this.disableLocalBallPhysics();
+      // Initialize interpolation targets
+      this.targetBallX = width / 2;
+      this.targetBallY = height / 2;
+      this.targetPaddle1Y = height / 2;
+      this.targetPaddle2Y = height / 2;
+    } else {
+      // Start the ball moving after a short delay (local mode only)
+      this.time.delayedCall(1000, () => this.launchBall());
     }
-
-    // Start the ball moving after a short delay
-    this.time.delayedCall(1000, () => this.launchBall());
   }
 
   /**
-   * Setup network mode UI and callbacks (Phase 2)
-   * Full physics sync will be implemented in Phase 3
+   * Disable local ball physics for networked mode
+   * Server is authoritative, client just renders
+   */
+  private disableLocalBallPhysics(): void {
+    const ballBody = this.ball.getSprite().body as Phaser.Physics.Arcade.Body;
+    // Disable world bounds collision - server handles this
+    ballBody.setCollideWorldBounds(false);
+    ballBody.onWorldBounds = false;
+    // Stop any existing velocity
+    ballBody.setVelocity(0, 0);
+  }
+
+  /**
+   * Setup network mode UI and callbacks (Phase 3)
+   * Server is authoritative, client interpolates state
    */
   private setupNetworkMode(width: number): void {
     if (!this.networkManager) return;
@@ -146,8 +184,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   /**
-   * Handle state changes from server (Phase 2 - basic sync)
-   * Full authoritative physics in Phase 3
+   * Handle state changes from server (Phase 3 - authoritative physics)
+   * Update target positions for interpolation
    */
   private onNetworkStateChange(state: GameStateSnapshot): void {
     // Update scores from server
@@ -160,8 +198,70 @@ export class GameScene extends Phaser.Scene {
       this.scoreText2.setText(this.score2.toString());
     }
 
-    // In Phase 3, we'll also sync paddle positions and ball state
-    // For Phase 2, local physics still controls the game
+    // Update ball target position and velocity
+    this.targetBallX = state.ballX;
+    this.targetBallY = state.ballY;
+    this.serverBallVelX = state.ballVelX;
+    this.serverBallVelY = state.ballVelY;
+
+    // Update paddle target positions and scales from players in state
+    const mySessionId = this.networkManager?.getSessionId();
+    for (const player of state.players.values()) {
+      if (player.playerNumber === 1) {
+        // For local player, we apply prediction so only update target for remote
+        if (player.sessionId !== mySessionId) {
+          this.targetPaddle1Y = player.y;
+        } else {
+          // Local player - still set target but we'll apply prediction
+          this.targetPaddle1Y = player.y;
+        }
+        // Update paddle scale from power-ups
+        if (this.paddle1Scale !== player.paddleScale) {
+          this.paddle1Scale = player.paddleScale;
+          this.paddle1.setScale(1, player.paddleScale);
+        }
+      } else if (player.playerNumber === 2) {
+        if (player.sessionId !== mySessionId) {
+          this.targetPaddle2Y = player.y;
+        } else {
+          this.targetPaddle2Y = player.y;
+        }
+        // Update paddle scale from power-ups
+        if (this.paddle2Scale !== player.paddleScale) {
+          this.paddle2Scale = player.paddleScale;
+          this.paddle2.setScale(1, player.paddleScale);
+        }
+      }
+    }
+
+    // Update power-ups (Phase 4)
+    this.updatePowerUps(state.powerUps);
+
+    // Check for game over from server
+    if (state.winner > 0 && !this.gameOver) {
+      this.showGameOver(state.winner);
+    }
+  }
+
+  /**
+   * Update power-up rendering based on server state
+   */
+  private updatePowerUps(serverPowerUps: Map<string, PowerUpSnapshot>): void {
+    // Remove power-ups that no longer exist on server
+    for (const [id, powerUpObj] of this.powerUpObjects) {
+      if (!serverPowerUps.has(id)) {
+        powerUpObj.destroy();
+        this.powerUpObjects.delete(id);
+      }
+    }
+
+    // Add new power-ups
+    for (const [id, powerUp] of serverPowerUps) {
+      if (!this.powerUpObjects.has(id) && powerUp.active) {
+        const powerUpObj = new PowerUpObject(this, powerUp.x, powerUp.y, powerUp.type);
+        this.powerUpObjects.set(id, powerUpObj);
+      }
+    }
   }
 
   private createProceduralGrid(width: number, height: number): void {
@@ -437,10 +537,143 @@ export class GameScene extends Phaser.Scene {
 
     const { height } = this.scale;
     
+    // Handle networked mode (Phase 3 - server authoritative)
+    if (this.isNetworked && this.networkManager) {
+      this.updateNetworkedMode(delta, height);
+      this.sendNetworkInput();
+      return;
+    }
+
+    // Local mode - handle input directly
+    this.updateLocalMode(delta, height);
+  }
+
+  /**
+   * Update for networked multiplayer mode (Phase 3)
+   * Uses interpolation for smooth rendering of server state
+   */
+  private updateNetworkedMode(delta: number, height: number): void {
+    const playerNumber = this.networkManager?.getPlayerNumber();
+    
+    // Get current input for local paddle prediction
+    const currentInput = this.getCurrentInput();
+    
+    // Local paddle prediction - move immediately on input
+    // Per domain_net.md: Local Prediction moves local paddle immediately
+    if (playerNumber === 1) {
+      // Apply local input immediately for responsive feel
+      if (currentInput === 'UP') {
+        this.paddle1.moveUp(delta, PADDLE_SPEED);
+      } else if (currentInput === 'DOWN') {
+        this.paddle1.moveDown(delta, PADDLE_SPEED, height);
+      }
+      this.paddle1.clampPosition(height);
+      
+      // Per domain_net.md: "Reconcile with server state only if deviation > 5px"
+      // Snap to server position if local prediction drifted too far
+      const paddle1Y = this.paddle1.getSprite().y;
+      if (Math.abs(paddle1Y - this.targetPaddle1Y) > RECONCILIATION_THRESHOLD) {
+        this.paddle1.getSprite().y = this.targetPaddle1Y;
+      }
+      
+      // Interpolate remote paddle (P2) to server position
+      const paddle2Sprite = this.paddle2.getSprite();
+      paddle2Sprite.y = Phaser.Math.Linear(
+        paddle2Sprite.y, 
+        this.targetPaddle2Y, 
+        this.INTERPOLATION_SPEED
+      );
+      this.paddle2.clampPosition(height);
+    } else {
+      // Apply local input immediately for responsive feel
+      if (currentInput === 'UP') {
+        this.paddle2.moveUp(delta, PADDLE_SPEED);
+      } else if (currentInput === 'DOWN') {
+        this.paddle2.moveDown(delta, PADDLE_SPEED, height);
+      }
+      this.paddle2.clampPosition(height);
+      
+      // Per domain_net.md: "Reconcile with server state only if deviation > 5px"
+      // Snap to server position if local prediction drifted too far
+      const paddle2Y = this.paddle2.getSprite().y;
+      if (Math.abs(paddle2Y - this.targetPaddle2Y) > RECONCILIATION_THRESHOLD) {
+        this.paddle2.getSprite().y = this.targetPaddle2Y;
+      }
+      
+      // Interpolate remote paddle (P1) to server position
+      const paddle1Sprite = this.paddle1.getSprite();
+      paddle1Sprite.y = Phaser.Math.Linear(
+        paddle1Sprite.y, 
+        this.targetPaddle1Y, 
+        this.INTERPOLATION_SPEED
+      );
+      this.paddle1.clampPosition(height);
+    }
+
+    // Interpolate ball position to server state
+    // Use velocity for extrapolation to reduce perceived lag
+    const ballSprite = this.ball.getSprite();
+    const deltaSeconds = delta / 1000;
+    
+    // Extrapolate target position using velocity
+    const extrapolatedX = this.targetBallX + this.serverBallVelX * deltaSeconds;
+    const extrapolatedY = this.targetBallY + this.serverBallVelY * deltaSeconds;
+    
+    // Smooth interpolation towards extrapolated position
+    ballSprite.x = Phaser.Math.Linear(ballSprite.x, extrapolatedX, this.INTERPOLATION_SPEED);
+    ballSprite.y = Phaser.Math.Linear(ballSprite.y, extrapolatedY, this.INTERPOLATION_SPEED);
+
+    // NOTE: Do NOT call this.touchInput.update() in networked mode!
+    // Fix for: "Avoid moving paddles via touch input in netplay"
+    // https://github.com/PR#comment - chatgpt-codex-connector suggestion
+    // Touch input is already processed via getCurrentInput() for the local paddle only.
+    // Calling touchInput.update() would incorrectly move BOTH paddles locally,
+    // fighting against server-authoritative state and causing jitter.
+  }
+
+  /**
+   * Get current input from keyboard or touch
+   */
+  private getCurrentInput(): 'UP' | 'DOWN' | 'NONE' {
+    const playerNumber = this.networkManager?.getPlayerNumber() ?? 1;
+    
+    // Check keyboard input for the appropriate player
+    if (this.keyboardKeys) {
+      if (playerNumber === 1) {
+        if (this.keyboardKeys.p1Up.isDown) return 'UP';
+        if (this.keyboardKeys.p1Down.isDown) return 'DOWN';
+      } else {
+        if (this.keyboardKeys.p2Up.isDown) return 'UP';
+        if (this.keyboardKeys.p2Down.isDown) return 'DOWN';
+      }
+    }
+
+    // Check for touch input for the current player
+    const playerSide = playerNumber === 1 ? 'left' : 'right';
+    const screenSplitX = this.scale.width / 2;
+    const screenCenterY = this.scale.height / 2;
+
+    for (const pointer of this.input.manager.pointers) {
+      if (!pointer.isDown) continue;
+
+      const currentSide = pointer.x < screenSplitX ? 'left' : 'right';
+      if (currentSide === playerSide) {
+        return pointer.y < screenCenterY ? 'UP' : 'DOWN';
+      }
+    }
+
+    return 'NONE';
+  }
+
+  /**
+   * Update for local single-device mode
+   * Both paddles controlled locally with physics handled client-side
+   */
+  private updateLocalMode(delta: number, height: number): void {
     // Update touch input
     this.touchInput.update();
 
-    // Handle keyboard input for desktop testing (use stored keys from create)
+    // Handle keyboard input for desktop testing
     if (this.keyboardKeys) {
       // Player 1 keyboard controls
       if (this.keyboardKeys.p1Up.isDown) {
@@ -460,58 +693,14 @@ export class GameScene extends Phaser.Scene {
     // Keep paddles in bounds
     this.paddle1.clampPosition(height);
     this.paddle2.clampPosition(height);
-
-    // Send input to server if in networked mode
-    if (this.isNetworked && this.networkManager) {
-      this.sendNetworkInput();
-    }
   }
 
   /**
-   * Send player input to server (Phase 2)
+   * Send player input to server
    * Per domain_net.md: Client sends intent (UP/DOWN), NOT position
    */
   private sendNetworkInput(): void {
     if (!this.networkManager) return;
-
-    const playerNumber = this.networkManager.getPlayerNumber();
-    
-    // Determine input based on touch or keyboard
-    let input: 'UP' | 'DOWN' | 'NONE' = 'NONE';
-    
-    // Check keyboard input for the appropriate player
-    if (this.keyboardKeys) {
-      if (playerNumber === 1) {
-        if (this.keyboardKeys.p1Up.isDown) input = 'UP';
-        else if (this.keyboardKeys.p1Down.isDown) input = 'DOWN';
-      } else {
-        if (this.keyboardKeys.p2Up.isDown) input = 'UP';
-        else if (this.keyboardKeys.p2Down.isDown) input = 'DOWN';
-      }
-    }
-
-    // If no keyboard input, check for touch input for the current player
-    if (input === 'NONE') {
-      const playerSide = playerNumber === 1 ? 'left' : 'right';
-      const screenSplitX = this.scale.width / 2;
-      const screenCenterY = this.scale.height / 2;
-
-      // Check all active pointers for touch input
-      for (const pointer of this.input.manager.pointers) {
-        if (!pointer.isDown) continue;
-
-        const currentSide = pointer.x < screenSplitX ? 'left' : 'right';
-        if (currentSide === playerSide) {
-          if (pointer.y < screenCenterY) {
-            input = 'UP';
-          } else {
-            input = 'DOWN';
-          }
-          break; // Found an active touch for this player
-        }
-      }
-    }
-    
-    this.networkManager.sendInput(input);
+    this.networkManager.sendInput(this.getCurrentInput());
   }
 }
