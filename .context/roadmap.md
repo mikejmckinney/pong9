@@ -16,12 +16,11 @@
 - [x] Port Physics logic from Client to Server.
 - [x] Implement Server Simulation Loop (60Hz with drift compensation).
 - [x] Implement Client-Side Prediction (Local) & Interpolation (Remote).
-- [ ] Add Power-Up Spawning Logic (Server-side) - deferred to Phase 4.
 
-## Phase 4: Polish & Persistence
+## Phase 4: Polish & Persistence 🔄 IN PROGRESS
+- [x] Add Power-Up System (server-side spawning and collision).
 - [ ] Integrate Firebase v9 for Leaderboards.
 - [x] Implement Procedural Audio (Web Audio API).
 - [x] Finalize CSS CRT Overlays.
-- [ ] Add Power-Up System (server-side spawning and collision).
 - [ ] Configure Dockerfile for deployment.
 - [ ] Add reconnection handling for dropped connections.

@@ -1,5 +1,6 @@
-import { Schema, type, MapSchema } from '@colyseus/schema';
+import { Schema, type, MapSchema, ArraySchema } from '@colyseus/schema';
 import { Player } from './Player.js';
+import { PowerUp, ActiveEffect } from './PowerUp.js';
 import { GAME_WIDTH, GAME_HEIGHT, BALL_SIZE } from '@pong9/shared/constants';
 import { GamePhase } from '@pong9/shared/interfaces';
 
@@ -25,6 +26,10 @@ export class GameState extends Schema {
 
   // Winner (1 or 2, 0 if no winner yet)
   @type('number') winner: number = 0;
+
+  // Power-ups (Phase 4)
+  @type({ map: PowerUp }) powerUps = new MapSchema<PowerUp>();
+  @type([ActiveEffect]) activeEffects = new ArraySchema<ActiveEffect>();
 
   /**
    * Get the half-size for bounds checking

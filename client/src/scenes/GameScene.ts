@@ -1,8 +1,9 @@
 import Phaser from 'phaser';
 import { Paddle } from '../objects/Paddle.ts';
 import { Ball } from '../objects/Ball.ts';
+import { PowerUpObject } from '../objects/PowerUp.ts';
 import { TouchInputManager } from '../input/TouchInputManager.ts';
-import { NetworkManager, GameStateSnapshot } from '../network/NetworkManager.ts';
+import { NetworkManager, GameStateSnapshot, PowerUpSnapshot } from '../network/NetworkManager.ts';
 import { PADDLE_SPEED, BALL_SPEED, WINNING_SCORE } from '@pong9/shared/constants';
 
 // Palette Constants (match values in domain_ui.md)
@@ -60,6 +61,11 @@ export class GameScene extends Phaser.Scene {
   private serverBallVelY = 0;
   // Interpolation factor (0 = instant, higher = smoother but more lag)
   private readonly INTERPOLATION_SPEED = 0.3;
+
+  // Power-up rendering (Phase 4)
+  private powerUpObjects = new Map<string, PowerUpObject>();
+  private paddle1Scale = 1;
+  private paddle2Scale = 1;
 
   constructor() {
     super('GameScene');
@@ -198,7 +204,7 @@ export class GameScene extends Phaser.Scene {
     this.serverBallVelX = state.ballVelX;
     this.serverBallVelY = state.ballVelY;
 
-    // Update paddle target positions from players in state
+    // Update paddle target positions and scales from players in state
     const mySessionId = this.networkManager?.getSessionId();
     for (const player of state.players.values()) {
       if (player.playerNumber === 1) {
@@ -209,18 +215,52 @@ export class GameScene extends Phaser.Scene {
           // Local player - still set target but we'll apply prediction
           this.targetPaddle1Y = player.y;
         }
+        // Update paddle scale from power-ups
+        if (this.paddle1Scale !== player.paddleScale) {
+          this.paddle1Scale = player.paddleScale;
+          this.paddle1.setScale(1, player.paddleScale);
+        }
       } else if (player.playerNumber === 2) {
         if (player.sessionId !== mySessionId) {
           this.targetPaddle2Y = player.y;
         } else {
           this.targetPaddle2Y = player.y;
         }
+        // Update paddle scale from power-ups
+        if (this.paddle2Scale !== player.paddleScale) {
+          this.paddle2Scale = player.paddleScale;
+          this.paddle2.setScale(1, player.paddleScale);
+        }
       }
     }
+
+    // Update power-ups (Phase 4)
+    this.updatePowerUps(state.powerUps);
 
     // Check for game over from server
     if (state.winner > 0 && !this.gameOver) {
       this.showGameOver(state.winner);
+    }
+  }
+
+  /**
+   * Update power-up rendering based on server state
+   */
+  private updatePowerUps(serverPowerUps: Map<string, PowerUpSnapshot>): void {
+    // Remove power-ups that no longer exist on server
+    for (const [id, powerUpObj] of this.powerUpObjects) {
+      if (!serverPowerUps.has(id)) {
+        powerUpObj.destroy();
+        this.powerUpObjects.delete(id);
+      }
+    }
+
+    // Add new power-ups
+    for (const [id, powerUp] of serverPowerUps) {
+      if (!this.powerUpObjects.has(id) && powerUp.active) {
+        const powerUpObj = new PowerUpObject(this, powerUp.x, powerUp.y, powerUp.type);
+        this.powerUpObjects.set(id, powerUpObj);
+      }
     }
   }
 

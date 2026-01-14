@@ -11,6 +11,7 @@ export class Player extends Schema {
   @type('string') sessionId: string = '';
   @type('boolean') connected: boolean = true;
   @type('uint8') playerNumber: 1 | 2;
+  @type('number') paddleScale: number = 1; // Power-up: paddle size multiplier
 
   constructor(isPlayer1: boolean, playerNumber: 1 | 2) {
     super();
@@ -21,15 +22,22 @@ export class Player extends Schema {
   }
 
   /**
+   * Get effective paddle height considering power-ups
+   */
+  getEffectivePaddleHeight(): number {
+    return PADDLE_HEIGHT * this.paddleScale;
+  }
+
+  /**
    * Apply vertical movement with bounds checking
    */
   moveUp(speed: number, deltaSeconds: number): void {
-    const halfHeight = PADDLE_HEIGHT / 2;
+    const halfHeight = this.getEffectivePaddleHeight() / 2;
     this.y = Math.max(halfHeight, this.y - speed * deltaSeconds);
   }
 
   moveDown(speed: number, deltaSeconds: number): void {
-    const halfHeight = PADDLE_HEIGHT / 2;
+    const halfHeight = this.getEffectivePaddleHeight() / 2;
     this.y = Math.min(GAME_HEIGHT - halfHeight, this.y + speed * deltaSeconds);
   }
 }

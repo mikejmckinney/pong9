@@ -1,6 +1,6 @@
 import { Room, Client } from 'colyseus';
-import { GameState, Player } from '../schemas/index.js';
-import { PlayerInput, GamePhase, PingMessage, PongMessage } from '@pong9/shared/interfaces';
+import { GameState, Player, PowerUp, ActiveEffect } from '../schemas/index.js';
+import { PlayerInput, GamePhase, PingMessage, PongMessage, PowerUpType } from '@pong9/shared/interfaces';
 import { 
   PADDLE_SPEED, 
   SERVER_TICK_RATE, 
@@ -9,8 +9,14 @@ import {
   GAME_HEIGHT,
   BALL_SIZE,
   PADDLE_WIDTH,
-  PADDLE_HEIGHT,
-  WINNING_SCORE
+  WINNING_SCORE,
+  POWERUP_SIZE,
+  POWERUP_SPAWN_INTERVAL,
+  POWERUP_DURATION,
+  POWERUP_SPAWN_CHANCE,
+  PADDLE_SIZE_MULTIPLIER,
+  BALL_SPEED_MULTIPLIER,
+  SLOW_BALL_MULTIPLIER
 } from '@pong9/shared/constants';
 
 /**
@@ -30,6 +36,11 @@ export class GameRoom extends Room<GameState> {
   private readonly tickIntervalMs: number = 1000 / SERVER_TICK_RATE;
   // Accumulated time for drift compensation
   private accumulatedDrift: number = 0;
+  // Power-up system (Phase 4)
+  private powerUpSpawnInterval: ReturnType<typeof setInterval> | null = null;
+  private powerUpIdCounter: number = 0;
+  // Ball speed modifier from power-ups
+  private ballSpeedModifier: number = 1;
 
   onCreate(): void {
     this.setState(new GameState());
@@ -123,6 +134,9 @@ export class GameRoom extends Room<GameState> {
     this.accumulatedDrift = 0;
     this.scheduleNextTick();
 
+    // Start power-up spawning (Phase 4)
+    this.startPowerUpSpawning();
+
     // Launch ball after a short delay (1 second)
     setTimeout(() => this.launchBall(), 1000);
   }
@@ -168,6 +182,12 @@ export class GameRoom extends Room<GameState> {
 
     // Update ball physics (movement, collisions, scoring)
     this.updateBallPhysics(deltaSeconds);
+
+    // Check power-up collisions (Phase 4)
+    this.checkPowerUpCollisions();
+
+    // Update active effects (check expiration)
+    this.updateActiveEffects();
 
     // Schedule the next tick with drift compensation
     this.scheduleNextTick();
@@ -229,7 +249,6 @@ export class GameRoom extends Room<GameState> {
     ballY: number
   ): { newVelX: number; newVelY: number; adjustedX: number } | null {
     const halfBall = BALL_SIZE / 2;
-    const halfPaddleHeight = PADDLE_HEIGHT / 2;
     const halfPaddleWidth = PADDLE_WIDTH / 2;
 
     // Get player paddles
@@ -241,8 +260,9 @@ export class GameRoom extends Room<GameState> {
       else if (player.playerNumber === 2) player2 = player;
     }
 
-    // Check Player 1 paddle (left side)
+    // Check Player 1 paddle (left side) - use effective paddle height for power-ups
     if (player1 && this.state.ballVelX < 0) {
+      const halfPaddleHeight = player1.getEffectivePaddleHeight() / 2;
       const paddleLeft = player1.x - halfPaddleWidth;
       const paddleRight = player1.x + halfPaddleWidth;
       const paddleTop = player1.y - halfPaddleHeight;
@@ -256,8 +276,9 @@ export class GameRoom extends Room<GameState> {
       }
     }
 
-    // Check Player 2 paddle (right side)
+    // Check Player 2 paddle (right side) - use effective paddle height for power-ups
     if (player2 && this.state.ballVelX > 0) {
+      const halfPaddleHeight = player2.getEffectivePaddleHeight() / 2;
       const paddleLeft = player2.x - halfPaddleWidth;
       const paddleRight = player2.x + halfPaddleWidth;
       const paddleTop = player2.y - halfPaddleHeight;
@@ -285,7 +306,7 @@ export class GameRoom extends Room<GameState> {
     ballY: number, 
     direction: 1 | -1
   ): { newVelX: number; newVelY: number; adjustedX: number } {
-    const halfPaddleHeight = PADDLE_HEIGHT / 2;
+    const halfPaddleHeight = paddle.getEffectivePaddleHeight() / 2;
     const halfPaddleWidth = PADDLE_WIDTH / 2;
     const halfBall = BALL_SIZE / 2;
 
@@ -297,7 +318,7 @@ export class GameRoom extends Room<GameState> {
     const maxBounceAngle = Math.PI / 3; // 60 degrees
     const bounceAngle = relativeIntersect * maxBounceAngle;
 
-    // Current speed with 5% increase per hit (capped at 2x base speed)
+    // Current speed with 5% increase per hit (capped at 2x base speed * speed modifier)
     // Speed increase makes rallies more exciting as they progress
     let currentSpeed = Math.sqrt(
       this.state.ballVelX * this.state.ballVelX + 
@@ -305,9 +326,10 @@ export class GameRoom extends Room<GameState> {
     );
     // Guard against zero speed (defensive coding to prevent NaN)
     if (currentSpeed === 0) {
-      currentSpeed = BALL_SPEED;
+      currentSpeed = BALL_SPEED * this.ballSpeedModifier;
     }
-    const newSpeed = Math.min(currentSpeed * 1.05, BALL_SPEED * 2);
+    const maxSpeed = BALL_SPEED * 2 * this.ballSpeedModifier;
+    const newSpeed = Math.min(currentSpeed * 1.05, maxSpeed);
 
     // Calculate new velocities
     // X velocity: direction determines left/right movement
@@ -397,6 +419,7 @@ export class GameRoom extends Room<GameState> {
     console.log(`[GameRoom] Ending game in room ${this.roomId}: ${reason}`);
     this.state.phase = GamePhase.FINISHED;
     this.stopSimulation();
+    this.stopPowerUpSpawning();
     this.broadcast('gameEnd', { reason });
   }
 
@@ -407,6 +430,205 @@ export class GameRoom extends Room<GameState> {
     if (this.simulationInterval) {
       clearTimeout(this.simulationInterval);
       this.simulationInterval = null;
+    }
+  }
+
+  // ==================== Power-Up System (Phase 4) ====================
+
+  /**
+   * Start periodic power-up spawning
+   */
+  private startPowerUpSpawning(): void {
+    this.powerUpSpawnInterval = setInterval(() => {
+      this.trySpawnPowerUp();
+    }, POWERUP_SPAWN_INTERVAL);
+  }
+
+  /**
+   * Stop power-up spawning
+   */
+  private stopPowerUpSpawning(): void {
+    if (this.powerUpSpawnInterval) {
+      clearInterval(this.powerUpSpawnInterval);
+      this.powerUpSpawnInterval = null;
+    }
+  }
+
+  /**
+   * Attempt to spawn a power-up with random chance
+   */
+  private trySpawnPowerUp(): void {
+    if (this.state.phase !== GamePhase.PLAYING) return;
+    
+    // Only spawn if there's no active power-up
+    if (this.state.powerUps.size > 0) return;
+
+    // Random chance to spawn
+    if (Math.random() > POWERUP_SPAWN_CHANCE) return;
+
+    // Random position in center area (avoid edges)
+    const margin = 200;
+    const x = margin + Math.random() * (GAME_WIDTH - margin * 2);
+    const y = margin + Math.random() * (GAME_HEIGHT - margin * 2);
+
+    // Random power-up type
+    const types = Object.values(PowerUpType);
+    const type = types[Math.floor(Math.random() * types.length)];
+
+    // Create power-up
+    const id = `powerup_${++this.powerUpIdCounter}`;
+    const powerUp = new PowerUp(id, type, x, y);
+    this.state.powerUps.set(id, powerUp);
+
+    console.log(`[GameRoom] Spawned ${type} power-up at (${x.toFixed(0)}, ${y.toFixed(0)})`);
+  }
+
+  /**
+   * Check if ball collides with any power-up
+   */
+  private checkPowerUpCollisions(): void {
+    const halfBall = BALL_SIZE / 2;
+    const halfPowerUp = POWERUP_SIZE / 2;
+
+    for (const [id, powerUp] of this.state.powerUps) {
+      if (!powerUp.active) continue;
+
+      // Simple AABB collision
+      const dx = Math.abs(this.state.ballX - powerUp.x);
+      const dy = Math.abs(this.state.ballY - powerUp.y);
+
+      if (dx < halfBall + halfPowerUp && dy < halfBall + halfPowerUp) {
+        // Determine which player gets the power-up based on ball direction
+        const playerId = this.state.ballVelX > 0 ? this.getPlayerByNumber(1)?.sessionId : this.getPlayerByNumber(2)?.sessionId;
+        
+        if (playerId) {
+          this.applyPowerUp(powerUp.powerUpType as PowerUpType, playerId);
+        }
+
+        // Remove power-up
+        this.state.powerUps.delete(id);
+        console.log(`[GameRoom] Power-up ${powerUp.powerUpType} collected!`);
+      }
+    }
+  }
+
+  /**
+   * Get player by their number (1 or 2)
+   */
+  private getPlayerByNumber(num: 1 | 2): Player | undefined {
+    for (const player of this.state.players.values()) {
+      if (player.playerNumber === num) return player;
+    }
+    return undefined;
+  }
+
+  /**
+   * Apply power-up effect to player
+   */
+  private applyPowerUp(type: PowerUpType, playerId: string): void {
+    const player = this.state.players.get(playerId);
+    if (!player) return;
+
+    // Create active effect
+    const effect = new ActiveEffect(type, playerId, POWERUP_DURATION);
+    this.state.activeEffects.push(effect);
+
+    // Apply immediate effect
+    switch (type) {
+      case PowerUpType.BIG_PADDLE:
+        player.paddleScale = PADDLE_SIZE_MULTIPLIER;
+        console.log(`[GameRoom] Player ${player.playerNumber} paddle enlarged!`);
+        break;
+
+      case PowerUpType.SHRINK_OPPONENT:
+        // Find opponent
+        const opponentNum = player.playerNumber === 1 ? 2 : 1;
+        const opponent = this.getPlayerByNumber(opponentNum);
+        if (opponent) {
+          opponent.paddleScale = 1 / PADDLE_SIZE_MULTIPLIER;
+          // Create effect for opponent
+          const opponentEffect = new ActiveEffect(type, opponent.sessionId, POWERUP_DURATION);
+          this.state.activeEffects.push(opponentEffect);
+          console.log(`[GameRoom] Player ${opponent.playerNumber} paddle shrunk!`);
+        }
+        break;
+
+      case PowerUpType.SPEED_UP:
+        this.ballSpeedModifier = BALL_SPEED_MULTIPLIER;
+        this.applyBallSpeedModifier();
+        console.log(`[GameRoom] Ball speed increased!`);
+        break;
+
+      case PowerUpType.SLOW_DOWN:
+        this.ballSpeedModifier = SLOW_BALL_MULTIPLIER;
+        this.applyBallSpeedModifier();
+        console.log(`[GameRoom] Ball speed decreased!`);
+        break;
+    }
+  }
+
+  /**
+   * Apply current ball speed modifier
+   */
+  private applyBallSpeedModifier(): void {
+    const currentSpeed = Math.sqrt(
+      this.state.ballVelX * this.state.ballVelX +
+      this.state.ballVelY * this.state.ballVelY
+    );
+    
+    if (currentSpeed === 0) return;
+
+    // Calculate target speed
+    const targetSpeed = BALL_SPEED * this.ballSpeedModifier;
+    const scale = targetSpeed / currentSpeed;
+
+    this.state.ballVelX *= scale;
+    this.state.ballVelY *= scale;
+  }
+
+  /**
+   * Update active effects and remove expired ones
+   */
+  private updateActiveEffects(): void {
+    const now = Date.now();
+    const expiredIndices: number[] = [];
+
+    // Find expired effects
+    for (let i = 0; i < this.state.activeEffects.length; i++) {
+      const effect = this.state.activeEffects[i];
+      if (now >= effect.expiresAt) {
+        expiredIndices.push(i);
+        this.removeEffect(effect);
+      }
+    }
+
+    // Remove expired effects (in reverse order to maintain indices)
+    for (let i = expiredIndices.length - 1; i >= 0; i--) {
+      this.state.activeEffects.splice(expiredIndices[i], 1);
+    }
+  }
+
+  /**
+   * Remove an effect and restore normal state
+   */
+  private removeEffect(effect: ActiveEffect): void {
+    const player = this.state.players.get(effect.playerId);
+    
+    switch (effect.effectType as PowerUpType) {
+      case PowerUpType.BIG_PADDLE:
+      case PowerUpType.SHRINK_OPPONENT:
+        if (player) {
+          player.paddleScale = 1;
+          console.log(`[GameRoom] Player ${player.playerNumber} paddle restored to normal`);
+        }
+        break;
+
+      case PowerUpType.SPEED_UP:
+      case PowerUpType.SLOW_DOWN:
+        this.ballSpeedModifier = 1;
+        this.applyBallSpeedModifier();
+        console.log(`[GameRoom] Ball speed restored to normal`);
+        break;
     }
   }
 }
