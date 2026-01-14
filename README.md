@@ -4,7 +4,7 @@ A mobile-first multiplayer Pong game with a Retro Synthwave aesthetic, built wit
 
 ## 🎮 Project Status
 
-**Current Phase:** Phase 1 - The Core Loop ✅ **COMPLETE** (Phase 2 networking scaffolding in progress)
+**Current Phase:** Phase 2 - The Network Plumbing 🚧 (Phase 1 complete)
 
 The game client is fully functional with:
 - ✅ Phaser 3 game engine with TypeScript
@@ -12,6 +12,7 @@ The game client is fully functional with:
 - ✅ Two-player local gameplay with touch controls
 - ✅ Mobile-first responsive design
 - ✅ Procedural graphics (no external assets)
+- 🚧 Online multiplayer via Colyseus with server-authoritative paddle/ball simulation and scoring (falls back to local play when offline)
 
 **Play it now:** See "Quick Start" below to run the game locally!
 
@@ -38,7 +39,7 @@ Then open http://localhost:3000 in your browser!
 - Touch the **right half** of the screen to control the **pink paddle** (Player 2)
 - Touch **upper half** to move **up**, **lower half** to move **down**
 
-### Run the Colyseus server (Phase 2 scaffolding)
+### Run the Colyseus server (Phase 2 online play)
 
 ```bash
 cd server
@@ -46,7 +47,7 @@ npm install
 npm run dev   # starts on ws://localhost:2567
 ```
 
-The client auto-connects to `ws://<host>:2567` by default. Override with `VITE_COLYSEUS_ENDPOINT` if the server runs elsewhere.
+The client auto-connects to `ws://<host>:2567` by default. Override with `VITE_COLYSEUS_ENDPOINT` if the server runs elsewhere; if unreachable, the game continues in local/offline mode.
 
 ### For AI Agents
 
@@ -85,7 +86,7 @@ cd client && npm run build
 └── test.sh               # Template verification
 ```
 
-## 🎨 Features (Planned)
+## 🎨 Features (Planned / In Progress)
 
 **Phase 1 - ✅ COMPLETE:**
 - ✅ **Mobile-First Design** - Touch controls with landscape orientation
@@ -94,8 +95,8 @@ cd client && npm run build
 - ✅ **Local Two-Player** - Split-screen touch zones for simultaneous control
 - ✅ **Responsive Scaling** - Phaser.Scale.FIT for any screen size
 
-**Phases 2-4 - Planned:**
-- **Multiplayer Networking** - Authoritative server with client-side prediction
+**Phases 2-4 - Planned/In Progress:**
+- **Multiplayer Networking (in progress)** - Authoritative server with paddle/ball simulation; client-side prediction/reconciliation still to come
 - **Leaderboard** - Firebase v9 integration
 - **Procedural Audio** - Web Audio API sounds
 
@@ -161,5 +162,5 @@ Built with guidance from AI agent onboarding templates and architectural best pr
 
 ---
 
-**Last Updated:** 2026-01-13  
+**Last Updated:** 2026-01-14  
 **Maintained By:** mikejmckinney and AI agents

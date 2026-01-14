@@ -1,25 +1,24 @@
 # 🧠 Active Agent State
-*Last Updated: 2026-01-13*
+*Last Updated: 2026-01-14*
 
 ## 📍 Current Status
-**Phase:** Phase 2 — The Network Plumbing - IN PROGRESS
-**Active Task:** Networking scaffolding underway. Colyseus room assigns player sides, processes paddle input, and client syncs paddle positions while keeping offline fallback. Continue progressing toward full server authority.
+**Phase:** Phase 2 — The Network Plumbing — WRAP-UP
+**Active Task:** Verified server-authoritative loop: Colyseus room assigns sides, processes paddle intent, simulates paddle + ball physics/scoring, and clients sync paddle/ball/score with offline fallback when waiting/offline. Preparing to start Phase 3 authoritative physics hardening.
 
 ## 📋 Context & Decisions
 * Phase 1 (local core loop) remains complete and stable.
 * Phase 2 networking progress:
-  - ✅ Colyseus server defined with per-room input queues and player side assignment
-  - ✅ Client joins room, shows waiting/online status, sends paddle inputs, and mirrors paddle positions from server state
+  - ✅ Colyseus server defined with per-room input queues, player side assignment, and authoritative paddle/ball simulation with scoring and respawn timing
+  - ✅ Client joins room, shows waiting/online status, sends paddle intent, mirrors paddle/ball/score from server state, and falls back to local loop when offline or waiting
   - ✅ Ping/Pong health-check wiring in place
-  - ⏳ Server currently syncs/simulates paddles only. Each client runs its own local ball physics and scoring using its own paddle state; server paddle positions are not yet used for ball or score calculations, so ball positions/scores may diverge between clients. True shared/authoritative ball physics will be introduced in Phase 3.
+  - ⚠️ Client-side prediction/reconciliation for network play is limited to simple position lerp; ball velocity is not yet synced for smoother interpolation.
 * Build system: Vite with TypeScript strict mode
 * All game objects created procedurally (no external image assets)
 * Known bugs: None currently recorded
 
 ## ⏭️ Next Steps
-1. Complete Phase 2 networking loop hardening:
-   - Validate remote paddle sync across two clients
-   - Add ready-state/connection messaging as needed
-2. Prepare for Phase 3 (Authoritative Physics):
-   - Move ball physics and scoring to server simulation
-   - Add client-side prediction + reconciliation for paddle inputs
+1. Begin Phase 3 (Authoritative Physics):
+   - Sync ball velocity in state for better client interpolation/prediction
+   - Add stronger client-side prediction + reconciliation for paddle inputs (snapshot-based)
+2. Add minimal regression tests for server simulation once headless harness is ready.
+3. Expand docs (AI_REPO_GUIDE/README) with online play notes and endpoint override reminders.
